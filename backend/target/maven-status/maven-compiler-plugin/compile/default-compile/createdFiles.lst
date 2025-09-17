@@ -6,3 +6,4 @@ com\miniproject\backend\controller\AuthController.class
 com\miniproject\backend\repository\ItemRepository.class
 com\miniproject\backend\model\Item.class
 com\miniproject\backend\BackendApplication.class
+com\miniproject\backend\model\Comment.class

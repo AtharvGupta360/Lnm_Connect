@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from "react-router-dom";
+import ProfilePage from "./ProfilePage";
 // Backend API URL
 const API_URL = "http://localhost:8080/api/items";
 
@@ -18,29 +20,64 @@ const App = () => {
     const storedIsLoggedIn = localStorage.getItem("isLoggedIn");
     const storedUsername = localStorage.getItem("username");
     const storedUser = localStorage.getItem("user");
-    
     if (storedIsLoggedIn === "true" && storedUsername && storedUser) {
       setIsLoggedIn(true);
       setUsername(storedUsername);
     }
   }, []);
 
+  // Get current user object from localStorage
+  function getCurrentUser() {
+    const user = localStorage.getItem("user");
+    if (user) {
+      try {
+        return JSON.parse(user);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
   // Fetch posts from backend when logged in or username changes
   useEffect(() => {
     if (isLoggedIn) {
       fetch(API_URL)
         .then(res => res.json())
-        .then(data => {
-          setPosts(data.map(item => ({
-            id: item.id || item._id,
-            user: item.name || username,
-            username: username,
-            content: item.description,
-            timestamp: "just now",
-            likes: 0,
-            avatar: `https://placehold.co/40x40/f59e0b/ffffff?text=${username.charAt(0).toUpperCase()}`,
-            image: item.image || null
-          })));
+        .then(async data => {
+          // For each post, fetch likes and comments
+          const postsWithDetails = await Promise.all(data.map(async item => {
+            const id = item.id || item._id;
+            // Fetch likes
+            let likes = 0;
+            let likedByUser = false;
+            try {
+              const resLikes = await fetch(`${API_URL}/${id}/likes`);
+              const likesArr = await resLikes.json();
+              likes = Array.isArray(likesArr) ? likesArr.length : 0;
+              likedByUser = Array.isArray(likesArr) && likesArr.includes(getUserId());
+            } catch {}
+            // Fetch comments
+            let comments = [];
+            try {
+              const resComments = await fetch(`${API_URL}/${id}/comments`);
+              comments = await resComments.json();
+            } catch {}
+            return {
+              id,
+              user: item.name || username,
+              username: username,
+              content: item.description,
+              timestamp: item.createdAt ? new Date(item.createdAt).toLocaleString() : "just now",
+              likes,
+              likedByUser,
+              avatar: `https://placehold.co/40x40/f59e0b/ffffff?text=${username.charAt(0).toUpperCase()}`,
+              image: item.image || null,
+              comments,
+              commentInput: ""
+            };
+          }));
+          setPosts(postsWithDetails);
         })
         .catch(() => setPosts([]));
     }
@@ -119,7 +156,8 @@ const App = () => {
       const item = {
         name: username.charAt(0).toUpperCase() + username.slice(1),
         description: newPost,
-        image: postImage || null
+        image: postImage || null,
+        userId: getCurrentUser()?.id
       };
       try {
         const res = await fetch(API_URL, {
@@ -148,10 +186,66 @@ const App = () => {
     }
   };
 
-  const handleLike = (postId) => {
-    setPosts(posts.map(post => 
-      post.id === postId ? { ...post, likes: post.likes + 1 } : post
-    ));
+  // Helper to get userId from localStorage (simulate, fallback to username)
+  function getUserId() {
+    const user = localStorage.getItem("user");
+    if (user) {
+      try {
+        const parsed = JSON.parse(user);
+        return parsed.id || parsed._id || parsed.email || username;
+      } catch {
+        return username;
+      }
+    }
+    return username;
+  }
+
+  // Like/unlike post using backend
+  const handleLike = async (postId) => {
+    try {
+      const res = await fetch(`${API_URL}/${postId}/like?userId=${encodeURIComponent(getUserId())}`, {
+        method: "POST"
+      });
+      const updated = await res.json();
+      // Update post in state
+      setPosts(posts => posts.map(post => {
+        if (post.id !== postId) return post;
+        const likesArr = updated.likes || [];
+        return {
+          ...post,
+          likes: likesArr.length,
+          likedByUser: likesArr.includes(getUserId())
+        };
+      }));
+    } catch {}
+  };
+
+  // Add comment to post
+  const handleAddComment = async (postId) => {
+    const post = posts.find(p => p.id === postId);
+    if (!post || !post.commentInput.trim()) return;
+    const comment = {
+      userId: getUserId(),
+      userName: username,
+      text: post.commentInput,
+      timestamp: Date.now()
+    };
+    try {
+      const res = await fetch(`${API_URL}/${postId}/comment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(comment)
+      });
+      const updated = await res.json();
+      setPosts(posts => posts.map(p => {
+        if (p.id !== postId) return p;
+        return {
+          ...p,
+          comments: updated.comments || [],
+          commentInput: ""
+        };
+      }));
+    } catch {}
   };
 
   if (!isLoggedIn) {
@@ -234,156 +328,196 @@ const App = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  LNMConnect
-                </h1>
+    <Router>
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <header className="bg-white shadow-sm border-b">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <Link to="/" className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                    LNMConnect
+                  </Link>
+                </div>
+                <nav className="ml-8 space-x-4">
+                  <Link to="/profile" className="text-indigo-600 hover:underline font-semibold">My Profile</Link>
+                </nav>
+              </div>
+              <div className="flex items-center space-x-4">
+                <span className="text-sm text-gray-600">Welcome, {username}!</span>
+                <button
+                  onClick={handleLogout}
+                  className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                >
+                  Logout
+                </button>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">Welcome, {username}!</span>
-              <button
-                onClick={handleLogout}
-                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
-              >
-                Logout
-              </button>
-            </div>
           </div>
-        </div>
-      </header>
-
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Sidebar */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Create Post */}
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Create a post</h2>
-              <form onSubmit={handleAddPost} className="space-y-4">
-                <textarea
-                  value={newPost}
-                  onChange={(e) => setNewPost(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                  rows="3"
-                  placeholder="What's on your mind?"
-                />
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    value={postImage}
-                    onChange={(e) => setPostImage(e.target.value)}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
-                    placeholder="Image URL (optional)"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!newPost.trim()}
-                    className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200"
-                  >
-                    Post
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* Posts Feed */}
-            <div className="space-y-6">
-              {posts.map((post) => (
-                <div key={post.id} className="bg-white rounded-xl shadow-sm border p-6">
-                  <div className="flex items-start space-x-3">
-                    <img
-                      src={post.avatar}
-                      alt={post.user}
-                      className="w-10 h-10 rounded-full flex-shrink-0"
-                    />
-                    <div className="flex-1">
+        </header>
+        <Routes>
+          <Route path="/" element={
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Left Sidebar */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Create Post */}
+                  <div className="bg-white rounded-xl shadow-sm border p-6">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Create a post</h2>
+                    <form onSubmit={handleAddPost} className="space-y-4">
+                      <textarea
+                        value={newPost}
+                        onChange={(e) => setNewPost(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                        rows="3"
+                        placeholder="What's on your mind?"
+                      />
                       <div className="flex items-center space-x-2">
-                        <h3 className="font-semibold text-gray-900">{post.user}</h3>
-                        <span className="text-sm text-gray-500">@{post.username}</span>
-                        <span className="text-sm text-gray-400">•</span>
-                        <span className="text-sm text-gray-500">{post.timestamp}</span>
-                      </div>
-                      <p className="text-gray-800 mt-2 whitespace-pre-wrap">{post.content}</p>
-                      
-                      {post.image && (
-                        <div className="mt-3 rounded-lg overflow-hidden">
-                          <img
-                            src={post.image}
-                            alt="Post content"
-                            className="w-full h-auto object-cover rounded-lg"
-                          />
-                        </div>
-                      )}
-                      
-                      <div className="flex items-center space-x-6 mt-4">
+                        <input
+                          type="text"
+                          value={postImage}
+                          onChange={(e) => setPostImage(e.target.value)}
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                          placeholder="Image URL (optional)"
+                        />
                         <button
-                          onClick={() => handleLike(post.id)}
-                          className="flex items-center space-x-1 text-gray-500 hover:text-red-500 transition-colors duration-200"
+                          type="submit"
+                          disabled={!newPost.trim()}
+                          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200"
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                          </svg>
-                          <span className="text-sm font-medium">{post.likes}</span>
+                          Post
                         </button>
+                      </div>
+                    </form>
+                  </div>
+                  {/* Posts Feed */}
+                  <div className="space-y-6">
+                    {posts.map((post) => (
+                      <div key={post.id} className="bg-white rounded-xl shadow-sm border p-6">
+                        <div className="flex items-start space-x-3">
+                          <img
+                            src={post.avatar}
+                            alt={post.user}
+                            className="w-10 h-10 rounded-full flex-shrink-0"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              {/* User name links to profile */}
+                              <Link to={`/profile/${encodeURIComponent(post.user)}`} className="font-semibold text-gray-900 hover:underline">{post.user}</Link>
+                              <span className="text-sm text-gray-500">@{post.username}</span>
+                              <span className="text-sm text-gray-400">•</span>
+                              <span className="text-sm text-gray-500">{post.timestamp}</span>
+                            </div>
+                            <p className="text-gray-800 mt-2 whitespace-pre-wrap">{post.content}</p>
+                            {post.image && (
+                              <div className="mt-3 rounded-lg overflow-hidden">
+                                <img
+                                  src={post.image}
+                                  alt="Post content"
+                                  className="w-full h-auto object-cover rounded-lg"
+                                />
+                              </div>
+                            )}
+                            <div className="flex items-center space-x-6 mt-4">
+                              <button
+                                onClick={() => handleLike(post.id)}
+                                className={`flex items-center space-x-1 ${post.likedByUser ? 'text-red-500' : 'text-gray-500'} hover:text-red-500 transition-colors duration-200`}
+                              >
+                                <svg className="w-5 h-5" fill={post.likedByUser ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                </svg>
+                                <span className="text-sm font-medium">{post.likes}</span>
+                              </button>
+                            </div>
+                            {/* Comments Section */}
+                            <div className="mt-4">
+                              <div className="mb-2 font-semibold text-gray-700">Comments</div>
+                              <div className="space-y-2 max-h-32 overflow-y-auto">
+                                {post.comments && post.comments.length > 0 ? post.comments.map((c, idx) => (
+                                  <div key={idx} className="flex items-start space-x-2">
+                                    <div className="w-8 h-8 bg-indigo-200 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xs">
+                                      {c.userName ? c.userName.charAt(0).toUpperCase() : '?'}
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-gray-800 text-sm">{c.userName || 'User'}</span>
+                                      <span className="ml-2 text-xs text-gray-400">{new Date(c.timestamp).toLocaleString()}</span>
+                                      <div className="text-gray-700 text-sm">{c.text}</div>
+                                    </div>
+                                  </div>
+                                )) : <div className="text-gray-400 text-sm">No comments yet.</div>}
+                              </div>
+                              {/* Add comment input */}
+                              <div className="flex items-center mt-2 space-x-2">
+                                <input
+                                  type="text"
+                                  value={post.commentInput || ""}
+                                  onChange={e => setPosts(posts => posts.map(p => p.id === post.id ? { ...p, commentInput: e.target.value } : p))}
+                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                  placeholder="Add a comment..."
+                                />
+                                <button
+                                  onClick={() => handleAddComment(post.id)}
+                                  className="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                                  disabled={!post.commentInput || !post.commentInput.trim()}
+                                >
+                                  Comment
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Right Sidebar */}
+                <div className="space-y-6">
+                  {/* Profile Card */}
+                  <div className="bg-white rounded-xl shadow-sm border p-6">
+                    <h3 className="font-semibold text-gray-900 mb-4">Your Profile</h3>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
+                        {username.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{username}</p>
+                        <p className="text-sm text-gray-500">@{username}</p>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Right Sidebar */}
-          <div className="space-y-6">
-            {/* Profile Card */}
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Your Profile</h3>
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
-                  {username.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">{username}</p>
-                  <p className="text-sm text-gray-500">@{username}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Stats */}
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Statistics</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Posts</span>
-                  <span className="font-medium">{posts.filter(p => p.username === username).length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Likes</span>
-                  <span className="font-medium">
-                    {posts.reduce((sum, post) => sum + post.likes, 0)}
-                  </span>
+                  {/* Stats */}
+                  <div className="bg-white rounded-xl shadow-sm border p-6">
+                    <h3 className="font-semibold text-gray-900 mb-4">Statistics</h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Posts</span>
+                        <span className="font-medium">{posts.filter(p => p.username === username).length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Total Likes</span>
+                        <span className="font-medium">
+                          {posts.reduce((sum, post) => sum + post.likes, 0)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Tips */}
+                  <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 p-6">
+                    <h3 className="font-semibold text-indigo-900 mb-2">Pro Tip</h3>
+                    <p className="text-indigo-700 text-sm">
+                      Share photos and stories to connect with others. The more you post, the more engagement you'll receive!
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
-
-            {/* Tips */}
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 p-6">
-              <h3 className="font-semibold text-indigo-900 mb-2">Pro Tip</h3>
-              <p className="text-indigo-700 text-sm">
-                Share photos and stories to connect with others. The more you post, the more engagement you'll receive!
-              </p>
-            </div>
-          </div>
-        </div>
+          } />
+          <Route path="/profile" element={<ProfilePage currentUser={getCurrentUser()} />} />
+          <Route path="/profile/:userId" element={<ProfilePage currentUser={getCurrentUser()} />} />
+        </Routes>
       </div>
-    </div>
+    </Router>
   );
 };
 export default App;

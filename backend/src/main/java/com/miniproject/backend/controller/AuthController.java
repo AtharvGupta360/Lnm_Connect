@@ -36,4 +36,16 @@ public class AuthController {
     public String test() {
         return "Backend is running!";
     }
+
+    // Get user by id
+    @GetMapping("/user/{id}")
+    public User getUserById(@PathVariable String id) {
+        return userRepository.findById(id).orElse(null);
+    }
+
+    // Get all users (for browsing profiles)
+    @GetMapping("/users")
+    public java.util.List<User> getAllUsers() {
+        return userRepository.findAll();
+    }
 }
