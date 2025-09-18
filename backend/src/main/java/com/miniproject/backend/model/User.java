@@ -11,6 +11,11 @@ public class User {
     private String email;
     private String password;
 
+    private java.util.List<String> skills;
+    private java.util.List<String> interests;
+    private String githubProfile;
+    private String portfolio;
+
     public User() {}
 
     public User(String name, String email, String password) {
@@ -18,6 +23,15 @@ public class User {
         this.email = email;
         this.password = password;
     }
+
+    public java.util.List<String> getSkills() { return skills; }
+    public void setSkills(java.util.List<String> skills) { this.skills = skills; }
+    public java.util.List<String> getInterests() { return interests; }
+    public void setInterests(java.util.List<String> interests) { this.interests = interests; }
+    public String getGithubProfile() { return githubProfile; }
+    public void setGithubProfile(String githubProfile) { this.githubProfile = githubProfile; }
+    public String getPortfolio() { return portfolio; }
+    public void setPortfolio(String portfolio) { this.portfolio = portfolio; }
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }

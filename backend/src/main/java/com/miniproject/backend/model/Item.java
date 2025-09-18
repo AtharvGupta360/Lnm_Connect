@@ -11,9 +11,20 @@ import java.util.Set;
 public class Item {
     @Id
     private String id;
-    private String name;
+
+    // Unified post fields
+    private String name; // legacy, can be used as fallback for authorName
     private String userId; // author id
-    private String description;
+    private String description; // legacy, can be used as fallback for body
+
+    // New post fields
+    private String title;
+    private List<String> tags;
+    private String body;
+    private String image;
+    private String authorName;
+    private List<String> taggedUserIds;
+    private List<String> taggedClubIds;
 
     private Set<String> likes = new HashSet<>(); // userIds who liked
     private List<Comment> comments;
@@ -30,6 +41,28 @@ public class Item {
         this.userId = userId;
         this.createdAt = System.currentTimeMillis();
     }
+
+    // New unified post fields
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+
+    public List<String> getTags() { return tags; }
+    public void setTags(List<String> tags) { this.tags = tags; }
+
+    public String getBody() { return body; }
+    public void setBody(String body) { this.body = body; }
+
+    public String getImage() { return image; }
+    public void setImage(String image) { this.image = image; }
+
+    public String getAuthorName() { return authorName; }
+    public void setAuthorName(String authorName) { this.authorName = authorName; }
+
+    public List<String> getTaggedUserIds() { return taggedUserIds; }
+    public void setTaggedUserIds(List<String> taggedUserIds) { this.taggedUserIds = taggedUserIds; }
+
+    public List<String> getTaggedClubIds() { return taggedClubIds; }
+    public void setTaggedClubIds(List<String> taggedClubIds) { this.taggedClubIds = taggedClubIds; }
     public String getUserId() { return userId; }
     public void setUserId(String userId) { this.userId = userId; }
 

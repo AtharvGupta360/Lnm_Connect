@@ -1,10 +1,22 @@
 import React, { useState, useEffect } from "react";
+// ...existing code...
+// Backend API URL
+const POST_TAGS = [
+  "Hackathon", "Internship", "Placement", "Gig/Freelance Work", "Workshop",
+  "Seminar", "Coding Contest", "Campus Event", "Scholarship", "Research Opportunity",
+  "Project Collaboration", "Open Source", "Startup", "Club Announcement",
+  "Competition", "Volunteering", "Technical Blog", "Achievement", "Miscellaneous"
+];
+import SignupDetails from "./SignupDetails";
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from "react-router-dom";
 import ProfilePage from "./ProfilePage";
 // Backend API URL
-const API_URL = "http://localhost:8080/api/items";
+const API_URL = "http://localhost:8080/api/posts";
 
 const App = () => {
+  // State for all users and clubs (for tagging in Create Post)
+  const [allUsers, setAllUsers] = useState([]);
+  const [allClubs, setAllClubs] = useState([]);
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -12,10 +24,59 @@ const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState("");
   const [posts, setPosts] = useState([]);
-  const [newPost, setNewPost] = useState("");
+  const [showCreatePost, setShowCreatePost] = useState(false);
+  const [postTitle, setPostTitle] = useState("");
+  const [postTags, setPostTags] = useState([]);
+  const [postBody, setPostBody] = useState("");
   const [postImage, setPostImage] = useState("");
+  const [postError, setPostError] = useState("");
+  const [postSuccess, setPostSuccess] = useState("");
+  const [showSignupDetails, setShowSignupDetails] = useState(false);
+  const [pendingUser, setPendingUser] = useState(null);
+  // State for tagging users and clubs in Create Post
+  const [taggedUserIds, setTaggedUserIds] = useState([]);
+  const [taggedClubIds, setTaggedClubIds] = useState([]);
 
-  // Initialize from local storage on mount
+  // Handle extended signup details after signup
+  const handleSignupDetails = async (details) => {
+    if (!pendingUser) return;
+    try {
+      const res = await fetch(`http://localhost:8080/api/auth/user/${pendingUser.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(details)
+      });
+      const updatedUser = await res.json();
+      setIsLoggedIn(true);
+    const userUsername = updatedUser && updatedUser.name ? updatedUser.name.split(' ')[0].toLowerCase() : "";
+      setUsername(userUsername);
+      localStorage.setItem("isLoggedIn", "true");
+      localStorage.setItem("username", userUsername);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      setShowSignupDetails(false);
+      setPendingUser(null);
+    } catch {
+      alert("Failed to save details");
+    }
+  };
+
+  const handleSkipSignupDetails = () => {
+    if (!pendingUser) return;
+    setIsLoggedIn(true);
+  const userUsername = pendingUser && pendingUser.name ? pendingUser.name.split(' ')[0].toLowerCase() : "";
+    setUsername(userUsername);
+    localStorage.setItem("isLoggedIn", "true");
+    localStorage.setItem("username", userUsername);
+    localStorage.setItem("user", JSON.stringify(pendingUser));
+    setShowSignupDetails(false);
+    setPendingUser(null);
+  };
+
+  // Returns the current user object from localStorage
+  const getCurrentUser = () => {
+    const user = localStorage.getItem("user");
+    return user ? JSON.parse(user) : null;
+  };
   useEffect(() => {
     const storedIsLoggedIn = localStorage.getItem("isLoggedIn");
     const storedUsername = localStorage.getItem("username");
@@ -24,28 +85,37 @@ const App = () => {
       setIsLoggedIn(true);
       setUsername(storedUsername);
     }
-  }, []);
 
-  // Get current user object from localStorage
-  function getCurrentUser() {
-    const user = localStorage.getItem("user");
-    if (user) {
+    // Fetch all users for tagging
+    async function fetchAllUsers() {
       try {
-        return JSON.parse(user);
-      } catch {
-        return null;
-      }
+        const res = await fetch("http://localhost:8080/api/users");
+        if (res.ok) {
+          const users = await res.json();
+          setAllUsers(users);
+        }
+      } catch {}
     }
-    return null;
-  }
-
-  // Fetch posts from backend when logged in or username changes
-  useEffect(() => {
+    // Fetch all clubs for tagging
+    async function fetchAllClubs() {
+      try {
+        const res = await fetch("http://localhost:8080/api/clubs");
+        if (res.ok) {
+          const clubs = await res.json();
+          setAllClubs(clubs);
+        }
+      } catch {}
+    }
     if (isLoggedIn) {
-      fetch(API_URL)
-        .then(res => res.json())
-        .then(async data => {
-          // For each post, fetch likes and comments
+      fetchAllUsers();
+      fetchAllClubs();
+    }
+
+    async function fetchPosts() {
+      if (isLoggedIn) {
+        try {
+          const res = await fetch(API_URL);
+          const data = await res.json();
           const postsWithDetails = await Promise.all(data.map(async item => {
             const id = item.id || item._id;
             // Fetch likes
@@ -63,24 +133,32 @@ const App = () => {
               const resComments = await fetch(`${API_URL}/${id}/comments`);
               comments = await resComments.json();
             } catch {}
+            // Use new Post fields if present, fallback to old Item fields
+            const postUser = item.authorName || item.name || username;
+            const postUsername = (item.authorName || item.name || username).split(' ')[0]?.toLowerCase() || username;
             return {
               id,
-              user: item.name || username,
-              username: username,
-              content: item.description,
+              user: postUser,
+              username: postUsername,
+              title: item.title || '',
+              tags: item.tags || [],
+              content: item.body || item.description || '',
               timestamp: item.createdAt ? new Date(item.createdAt).toLocaleString() : "just now",
               likes,
               likedByUser,
-              avatar: `https://placehold.co/40x40/f59e0b/ffffff?text=${username.charAt(0).toUpperCase()}`,
+              avatar: `https://placehold.co/40x40/f59e0b/ffffff?text=${postUsername.charAt(0).toUpperCase()}`,
               image: item.image || null,
               comments,
               commentInput: ""
             };
           }));
           setPosts(postsWithDetails);
-        })
-        .catch(() => setPosts([]));
+        } catch {
+          setPosts([]);
+        }
+      }
     }
+    fetchPosts();
   }, [isLoggedIn, username]);
 
   // Real authentication with backend
@@ -95,19 +173,28 @@ const App = () => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email, password })
           });
+          if (!res.ok) {
+            throw new Error("Invalid credentials");
+          }
           const user = await res.json();
+          if (!user || !user.name || !user.email) {
+            throw new Error("Invalid credentials");
+          }
           setIsLoggedIn(true);
           const userUsername = user.name.split(' ')[0].toLowerCase();
           setUsername(userUsername);
-          
           // Store in localStorage
           localStorage.setItem("isLoggedIn", "true");
           localStorage.setItem("username", userUsername);
           localStorage.setItem("user", JSON.stringify(user));
-          
           console.log("Login successful");
         } catch (error) {
           alert("Invalid credentials");
+          setIsLoggedIn(false);
+          setUsername("");
+          localStorage.removeItem("isLoggedIn");
+          localStorage.removeItem("username");
+          localStorage.removeItem("user");
         }
       }
     } else {
@@ -120,16 +207,10 @@ const App = () => {
             body: JSON.stringify({ name, email, password })
           });
           const user = await res.json();
-          setIsLoggedIn(true);
-          const userUsername = name.split(' ')[0].toLowerCase();
-          setUsername(userUsername);
-          
-          // Store in localStorage
-          localStorage.setItem("isLoggedIn", "true");
-          localStorage.setItem("username", userUsername);
-          localStorage.setItem("user", JSON.stringify(user));
-          
-          console.log("Signup successful");
+          setPendingUser(user);
+          setShowSignupDetails(true);
+          // Do not set isLoggedIn yet; wait for details or skip
+          console.log("Signup successful, show details page");
         } catch (error) {
           alert("User already exists");
         }
@@ -151,39 +232,8 @@ const App = () => {
 
   // Add new post to backend
   const handleAddPost = async (e) => {
-    e.preventDefault();
-    if (newPost.trim()) {
-      const item = {
-        name: username.charAt(0).toUpperCase() + username.slice(1),
-        description: newPost,
-        image: postImage || null,
-        userId: getCurrentUser()?.id
-      };
-      try {
-        const res = await fetch(API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(item)
-        });
-        const saved = await res.json();
-        setPosts([{ 
-          id: saved.id || saved._id,
-          user: saved.name || username,
-          username: username,
-          content: saved.description,
-          timestamp: "just now",
-          likes: 0,
-          avatar: `https://placehold.co/40x40/f59e0b/ffffff?text=${username.charAt(0).toUpperCase()}`,
-          image: saved.image || null
-        }, ...posts]);
-        setNewPost("");
-        setPostImage("");
-      } catch {
-        setPosts([{ ...item, id: posts.length + 1, likes: 0, timestamp: "just now", avatar: `https://placehold.co/40x40/f59e0b/ffffff?text=${username.charAt(0).toUpperCase()}` }, ...posts]);
-        setNewPost("");
-        setPostImage("");
-      }
-    }
+    // Legacy add post logic removed. Use modal/create post form only.
+    return;
   };
 
   // Helper to get userId from localStorage (simulate, fallback to username)
@@ -248,6 +298,9 @@ const App = () => {
     } catch {}
   };
 
+  if (showSignupDetails && pendingUser) {
+    return <SignupDetails onSubmit={handleSignupDetails} onSkip={handleSkipSignupDetails} />;
+  }
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center p-4">
@@ -365,31 +418,152 @@ const App = () => {
                   {/* Create Post */}
                   <div className="bg-white rounded-xl shadow-sm border p-6">
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">Create a post</h2>
-                    <form onSubmit={handleAddPost} className="space-y-4">
-                      <textarea
-                        value={newPost}
-                        onChange={(e) => setNewPost(e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                        rows="3"
-                        placeholder="What's on your mind?"
-                      />
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="text"
-                          value={postImage}
-                          onChange={(e) => setPostImage(e.target.value)}
-                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
-                          placeholder="Image URL (optional)"
-                        />
-                        <button
-                          type="submit"
-                          disabled={!newPost.trim()}
-                          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200"
-                        >
-                          Post
-                        </button>
+                    <button
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium mb-2"
+                      onClick={() => setShowCreatePost(true)}
+                    >Create Post</button>
+                    {showCreatePost && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 relative">
+                          <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-2xl" onClick={() => setShowCreatePost(false)}>&times;</button>
+                          <h3 className="text-xl font-bold mb-4 text-indigo-700">New Post</h3>
+                          {postError && <div className="text-red-500 mb-2">{postError}</div>}
+                          {postSuccess && <div className="text-green-600 mb-2">{postSuccess}</div>}
+                          <form onSubmit={async e => {
+                            e.preventDefault();
+                            setPostError("");
+                            setPostSuccess("");
+                            if (!postTitle.trim() || postTags.length === 0 || !postBody.trim()) {
+                              setPostError("Please fill all required fields.");
+                              return;
+                            }
+                            try {
+                              const user = getCurrentUser();
+                              const res = await fetch("http://localhost:8080/api/posts", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  title: postTitle,
+                                  tags: postTags,
+                                  body: postBody,
+                                  image: postImage,
+                                  authorId: user && user.id,
+                                  authorName: user && user.name,
+                                  taggedUserIds,
+                                  taggedClubIds
+                                })
+                              });
+                              if (!res.ok) throw new Error("Failed to create post");
+                              setPostSuccess("Post created successfully!");
+                              setPostTitle("");
+                              setPostTags([]);
+                              setPostBody("");
+                              setPostImage("");
+                              setTaggedUserIds([]);
+                              setTaggedClubIds([]);
+                              setTimeout(() => {
+                                setShowCreatePost(false);
+                                setPostSuccess("");
+                              }, 1200);
+                            } catch {
+                              setPostError("Failed to create post. Please try again.");
+                            }
+                            <>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Tag Users</label>
+                                <select
+                                  multiple
+                                  value={taggedUserIds}
+                                  onChange={e => {
+                                    const opts = Array.from(e.target.selectedOptions).map(o => o.value);
+                                    setTaggedUserIds(opts);
+                                  }}
+                                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                >
+                                  {allUsers.map(u => (
+                                    <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+                                  ))}
+                                </select>
+                                <div className="text-xs text-gray-500 mt-1">Hold Ctrl (Windows) or Cmd (Mac) to select multiple</div>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Tag Clubs</label>
+                                <select
+                                  multiple
+                                  value={taggedClubIds}
+                                  onChange={e => {
+                                    const opts = Array.from(e.target.selectedOptions).map(o => o.value);
+                                    setTaggedClubIds(opts);
+                                  }}
+                                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                >
+                                  {allClubs.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                  ))}
+                                </select>
+                                <div className="text-xs text-gray-500 mt-1">Hold Ctrl (Windows) or Cmd (Mac) to select multiple</div>
+                              </div>
+                            </>
+                          }} className="space-y-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Title<span className="text-red-500">*</span></label>
+                              <input
+                                type="text"
+                                value={postTitle}
+                                onChange={e => setPostTitle(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                placeholder="Enter post title"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Tags<span className="text-red-500">*</span></label>
+                              <select
+                                multiple
+                                value={postTags}
+                                onChange={e => {
+                                  const opts = Array.from(e.target.selectedOptions).map(o => o.value);
+                                  setPostTags(opts);
+                                }}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                              >
+                                {POST_TAGS.map(tag => (
+                                  <option key={tag} value={tag}>{tag}</option>
+                                ))}
+                              </select>
+                              <div className="text-xs text-gray-500 mt-1">Hold Ctrl (Windows) or Cmd (Mac) to select multiple</div>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Body<span className="text-red-500">*</span></label>
+                              <textarea
+                                value={postBody}
+                                onChange={e => setPostBody(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                                rows="5"
+                                placeholder="Write your post here..."
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Image (optional)</label>
+                              <input
+                                type="text"
+                                value={postImage}
+                                onChange={e => setPostImage(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                placeholder="Image URL (optional)"
+                              />
+                            </div>
+                            <div className="flex justify-end">
+                              <button
+                                type="submit"
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200"
+                              >Post</button>
+                            </div>
+                          </form>
+                        </div>
                       </div>
-                    </form>
+                    )}
                   </div>
                   {/* Posts Feed */}
                   <div className="space-y-6">
@@ -409,6 +583,13 @@ const App = () => {
                               <span className="text-sm text-gray-400">•</span>
                               <span className="text-sm text-gray-500">{post.timestamp}</span>
                             </div>
+                            {post.tags && post.tags.length > 0 && (
+                              <div className="mb-2 flex flex-wrap gap-2">
+                                {post.tags.map((tag, idx) => (
+                                  <span key={idx} className="font-bold text-indigo-700 bg-indigo-100 px-2 py-1 rounded-full text-xs uppercase tracking-wide border border-indigo-300">#{tag}</span>
+                                ))}
+                              </div>
+                            )}
                             <p className="text-gray-800 mt-2 whitespace-pre-wrap">{post.content}</p>
                             {post.image && (
                               <div className="mt-3 rounded-lg overflow-hidden">
@@ -519,5 +700,5 @@ const App = () => {
       </div>
     </Router>
   );
-};
+}
 export default App;

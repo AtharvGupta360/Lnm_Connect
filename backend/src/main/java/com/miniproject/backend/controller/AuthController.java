@@ -43,6 +43,18 @@ public class AuthController {
         return userRepository.findById(id).orElse(null);
     }
 
+    // Update user details after signup (skills, interests, githubProfile, portfolio)
+    @PutMapping("/user/{id}")
+    public User updateUserDetails(@PathVariable String id, @RequestBody User userDetails) {
+        return userRepository.findById(id).map(user -> {
+            user.setSkills(userDetails.getSkills());
+            user.setInterests(userDetails.getInterests());
+            user.setGithubProfile(userDetails.getGithubProfile());
+            user.setPortfolio(userDetails.getPortfolio());
+            return userRepository.save(user);
+        }).orElse(null);
+    }
+
     // Get all users (for browsing profiles)
     @GetMapping("/users")
     public java.util.List<User> getAllUsers() {
