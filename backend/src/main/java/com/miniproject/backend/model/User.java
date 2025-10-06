@@ -15,6 +15,11 @@ public class User {
     private java.util.List<String> interests;
     private String githubProfile;
     private String portfolio;
+    private String bio;
+    private String education;
+    private String branchYear;
+    private String contact;
+    private String photoUrl;
 
     public User() {}
 
@@ -23,6 +28,17 @@ public class User {
         this.email = email;
         this.password = password;
     }
+
+    public String getBio() { return bio; }
+    public void setBio(String bio) { this.bio = bio; }
+    public String getEducation() { return education; }
+    public void setEducation(String education) { this.education = education; }
+    public String getBranchYear() { return branchYear; }
+    public void setBranchYear(String branchYear) { this.branchYear = branchYear; }
+    public String getContact() { return contact; }
+    public void setContact(String contact) { this.contact = contact; }
+    public String getPhotoUrl() { return photoUrl; }
+    public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
 
     public java.util.List<String> getSkills() { return skills; }
     public void setSkills(java.util.List<String> skills) { this.skills = skills; }

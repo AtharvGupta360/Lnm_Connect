@@ -17,6 +17,16 @@ public class AuthController {
         if (userRepository.findByEmail(user.getEmail()) != null) {
             throw new RuntimeException("User already exists");
         }
+        // Defensive: ensure all fields are initialized
+        if (user.getSkills() == null) user.setSkills(new java.util.ArrayList<>());
+        if (user.getInterests() == null) user.setInterests(new java.util.ArrayList<>());
+        if (user.getGithubProfile() == null) user.setGithubProfile("");
+        if (user.getPortfolio() == null) user.setPortfolio("");
+        if (user.getBio() == null) user.setBio("");
+        if (user.getEducation() == null) user.setEducation("");
+        if (user.getBranchYear() == null) user.setBranchYear("");
+        if (user.getContact() == null) user.setContact("");
+        if (user.getPhotoUrl() == null) user.setPhotoUrl("");
         User savedUser = userRepository.save(user);
         System.out.println("[INFO] User signed up: " + user.getEmail());
         return savedUser;

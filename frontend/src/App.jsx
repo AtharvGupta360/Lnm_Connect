@@ -258,12 +258,21 @@ const App = () => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name, email, password })
           });
+          if (!res.ok) {
+            const text = await res.text();
+            if (text && text.includes("User already exists")) {
+              alert("A user with this email already exists. Please use a different email or log in.");
+            } else {
+              alert("Signup failed. Please try again.");
+            }
+            return;
+          }
           const user = await res.json();
           setPendingUser(user);
           setShowSignupDetails(true);
           console.log("Signup successful, show details page");
         } catch (error) {
-          alert("User already exists");
+          alert("Signup failed. Please try again.");
         }
       }
     }
