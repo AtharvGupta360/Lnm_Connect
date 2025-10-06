@@ -84,6 +84,13 @@ const ProfilePage = ({ currentUser }) => {
       </div>
     );
   }
+  if (!user) {
+    return (
+      <div className="max-w-2xl mx-auto py-8 text-center text-gray-500">
+        User not found.
+      </div>
+    );
+  }
 
   // Main profile card with Framer Motion animation
   return (
@@ -275,17 +282,21 @@ const ProfilePage = ({ currentUser }) => {
                 <div className="font-semibold text-slate-900 text-base">{cert.title}</div>
                 <div className="text-slate-500 text-sm">{cert.organization} &bull; {cert.date}</div>
               </div>
-              <div className="flex gap-2">
-                <button className="inline-flex items-center gap-1 px-3 py-1 rounded bg-indigo-100 text-indigo-700 font-semibold hover:bg-indigo-200 transition" onClick={() => { setCertForm(cert); setShowCertModal(true); }}><FaEdit /> Edit</button>
-                <button className="inline-flex items-center gap-1 px-3 py-1 rounded bg-rose-100 text-rose-700 font-semibold hover:bg-rose-200 transition" onClick={async () => {
-                  await fetch(`${API_URL}/certificates/${cert.id}`, { method: 'DELETE' });
-                  setCertificates(certificates.filter(c => c.id !== cert.id));
-                }}>Delete</button>
-              </div>
+              {userId === currentUser?.id && (
+                <div className="flex gap-2">
+                  <button className="inline-flex items-center gap-1 px-3 py-1 rounded bg-indigo-100 text-indigo-700 font-semibold hover:bg-indigo-200 transition" onClick={() => { setCertForm(cert); setShowCertModal(true); }}><FaEdit /> Edit</button>
+                  <button className="inline-flex items-center gap-1 px-3 py-1 rounded bg-rose-100 text-rose-700 font-semibold hover:bg-rose-200 transition" onClick={async () => {
+                    await fetch(`${API_URL}/certificates/${cert.id}`, { method: 'DELETE' });
+                    setCertificates(certificates.filter(c => c.id !== cert.id));
+                  }}>Delete</button>
+                </div>
+              )}
             </motion.div>
           ))}
         </div>
-        <button className="mt-6 inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-emerald-500 text-white font-semibold shadow hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-400 transition text-base" onClick={() => { setCertForm({ title: '', organization: '', date: '', file: null }); setShowCertModal(true); }}><FaPlus /> Add Certificate</button>
+        {userId === currentUser?.id && (
+          <button className="mt-6 inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-emerald-500 text-white font-semibold shadow hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-400 transition text-base" onClick={() => { setCertForm({ title: '', organization: '', date: '', file: null }); setShowCertModal(true); }}><FaPlus /> Add Certificate</button>
+        )}
       </div>
       {/* Certificate Modal (card-style, animated) */}
       {showCertModal && (

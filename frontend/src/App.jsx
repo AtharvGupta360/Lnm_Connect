@@ -132,9 +132,11 @@ const App = () => {
         
         const postUser = item.authorName || item.name || username;
         const postUsername = (item.authorName || item.name || username).split(' ')[0]?.toLowerCase() || username;
+        const authorId = item.authorId || item.author_id || item.userId || item.user_id || item.id || item._id;
         
         return {
           id,
+          authorId,
           user: postUser,
           username: postUsername,
           title: item.title || '',
@@ -624,7 +626,7 @@ const App = () => {
                           />
                           <div className="flex-1">
                             <div className="flex items-center space-x-2">
-                              <Link to={`/profile/${encodeURIComponent(post.user)}`} className="font-semibold text-gray-900 hover:underline">{post.user}</Link>
+                              <Link to={`/profile/${post.authorId || post.id}`} className="font-semibold text-gray-900 hover:underline">{post.user}</Link>
                               <span className="text-sm text-gray-500">@{post.username}</span>
                               <span className="text-sm text-gray-400">•</span>
                               <span className="text-sm text-gray-500">{post.timestamp}</span>
