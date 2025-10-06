@@ -63,8 +63,41 @@ public class PostController {
     }
 
     @GetMapping
-    public List<Post> getAllPosts() {
-        return postRepository.findAll();
+    public List<Post> getAllPosts(
+            @RequestParam(value = "sort", required = false) String sort,
+            @RequestParam(value = "tag", required = false) String tag,
+            @RequestParam(value = "author", required = false) String author,
+            @RequestParam(value = "from", required = false) Long from,
+            @RequestParam(value = "to", required = false) Long to
+    ) {
+        List<Post> posts = postRepository.findAll();
+        // Filter by tag
+        if (tag != null && !tag.isEmpty()) {
+            posts.removeIf(post -> post.getTags() == null || !post.getTags().contains(tag));
+        }
+        // Filter by author
+        if (author != null && !author.isEmpty()) {
+            posts.removeIf(post -> post.getAuthorName() == null || !post.getAuthorName().equalsIgnoreCase(author));
+        }
+        // Filter by time range
+        if (from != null) {
+            posts.removeIf(post -> post.getCreatedAt() < from);
+        }
+        if (to != null) {
+            posts.removeIf(post -> post.getCreatedAt() > to);
+        }
+        // Sort
+        if ("likes".equalsIgnoreCase(sort)) {
+            posts.sort((a, b) -> Integer.compare(
+                b.getLikes() != null ? b.getLikes().size() : 0,
+                a.getLikes() != null ? a.getLikes().size() : 0
+            ));
+        } else if ("oldest".equalsIgnoreCase(sort)) {
+            posts.sort((a, b) -> Long.compare(a.getCreatedAt(), b.getCreatedAt()));
+        } else { // default or "recent"
+            posts.sort((a, b) -> Long.compare(b.getCreatedAt(), a.getCreatedAt()));
+        }
+        return posts;
     }
 
     @GetMapping("/user/{userId}")

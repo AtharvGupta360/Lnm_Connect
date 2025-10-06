@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from "react";
-// ...existing code...
+import SignupDetails from "./SignupDetails";
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from "react-router-dom";
+import ProfilePage from "./ProfilePage";
+
 // Backend API URL
+const API_URL = "http://localhost:8080/api/posts";
+
 const POST_TAGS = [
   "Hackathon", "Internship", "Placement", "Gig/Freelance Work", "Workshop",
   "Seminar", "Coding Contest", "Campus Event", "Scholarship", "Research Opportunity",
   "Project Collaboration", "Open Source", "Startup", "Club Announcement",
   "Competition", "Volunteering", "Technical Blog", "Achievement", "Miscellaneous"
 ];
-import SignupDetails from "./SignupDetails";
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from "react-router-dom";
-import ProfilePage from "./ProfilePage";
-// Backend API URL
-const API_URL = "http://localhost:8080/api/posts";
 
 const App = () => {
+  // Sorting/filtering state
+  const [sortOption, setSortOption] = useState("recent");
+  const [filterTag, setFilterTag] = useState("");
+  
   // State for all users and clubs (for tagging in Create Post)
   const [allUsers, setAllUsers] = useState([]);
   const [allClubs, setAllClubs] = useState([]);
@@ -33,6 +37,7 @@ const App = () => {
   const [postSuccess, setPostSuccess] = useState("");
   const [showSignupDetails, setShowSignupDetails] = useState(false);
   const [pendingUser, setPendingUser] = useState(null);
+  
   // State for tagging users and clubs in Create Post
   const [taggedUserIds, setTaggedUserIds] = useState([]);
   const [taggedClubIds, setTaggedClubIds] = useState([]);
@@ -48,7 +53,7 @@ const App = () => {
       });
       const updatedUser = await res.json();
       setIsLoggedIn(true);
-    const userUsername = updatedUser && updatedUser.name ? updatedUser.name.split(' ')[0].toLowerCase() : "";
+      const userUsername = updatedUser && updatedUser.name ? updatedUser.name.split(' ')[0].toLowerCase() : "";
       setUsername(userUsername);
       localStorage.setItem("isLoggedIn", "true");
       localStorage.setItem("username", userUsername);
@@ -63,7 +68,7 @@ const App = () => {
   const handleSkipSignupDetails = () => {
     if (!pendingUser) return;
     setIsLoggedIn(true);
-  const userUsername = pendingUser && pendingUser.name ? pendingUser.name.split(' ')[0].toLowerCase() : "";
+    const userUsername = pendingUser && pendingUser.name ? pendingUser.name.split(' ')[0].toLowerCase() : "";
     setUsername(userUsername);
     localStorage.setItem("isLoggedIn", "true");
     localStorage.setItem("username", userUsername);
@@ -77,6 +82,95 @@ const App = () => {
     const user = localStorage.getItem("user");
     return user ? JSON.parse(user) : null;
   };
+
+  // Helper to get userId from localStorage (simulate, fallback to username)
+  function getUserId() {
+    const user = localStorage.getItem("user");
+    if (user) {
+      try {
+        const parsed = JSON.parse(user);
+        return parsed.id || parsed._id || parsed.email || username;
+      } catch {
+        return username;
+      }
+    }
+    return username;
+  }
+
+  // Fetch posts function
+  const fetchPosts = async () => {
+    if (!isLoggedIn) return;
+    
+    try {
+      // Build query params for tag filtering only
+      const params = [];
+      if (filterTag) params.push(`tag=${encodeURIComponent(filterTag)}`);
+      
+      const url = params.length ? `${API_URL}?${params.join("&")}` : API_URL;
+      const res = await fetch(url);
+      const data = await res.json();
+      
+      const postsWithDetails = await Promise.all(data.map(async item => {
+        const id = item.id || item._id;
+        
+        // Fetch likes
+        let likes = 0;
+        let likedByUser = false;
+        try {
+          const resLikes = await fetch(`${API_URL}/${id}/likes`);
+          const likesArr = await resLikes.json();
+          likes = Array.isArray(likesArr) ? likesArr.length : 0;
+          likedByUser = Array.isArray(likesArr) && likesArr.includes(getUserId());
+        } catch {}
+        
+        // Fetch comments
+        let comments = [];
+        try {
+          const resComments = await fetch(`${API_URL}/${id}/comments`);
+          comments = await resComments.json();
+        } catch {}
+        
+        const postUser = item.authorName || item.name || username;
+        const postUsername = (item.authorName || item.name || username).split(' ')[0]?.toLowerCase() || username;
+        
+        return {
+          id,
+          user: postUser,
+          username: postUsername,
+          title: item.title || '',
+          tags: item.tags || [],
+          content: item.body || item.description || '',
+          timestamp: item.createdAt ? new Date(item.createdAt).toLocaleString() : "just now",
+          createdAt: item.createdAt ? new Date(item.createdAt).getTime() : Date.now(), // For sorting
+          likes,
+          likedByUser,
+          avatar: `https://placehold.co/40x40/f59e0b/ffffff?text=${postUsername.charAt(0).toUpperCase()}`,
+          image: item.image || null,
+          comments,
+          commentInput: ""
+        };
+      }));
+      
+      // Apply sorting on frontend
+      const sortedPosts = [...postsWithDetails].sort((a, b) => {
+        switch (sortOption) {
+          case "recent":
+            return b.createdAt - a.createdAt; // Most recent first
+          case "likes":
+            return b.likes - a.likes; // Most liked first
+          case "oldest":
+            return a.createdAt - b.createdAt; // Oldest first
+          default:
+            return b.createdAt - a.createdAt;
+        }
+      });
+      
+      setPosts(sortedPosts);
+    } catch {
+      setPosts([]);
+    }
+  };
+
   useEffect(() => {
     const storedIsLoggedIn = localStorage.getItem("isLoggedIn");
     const storedUsername = localStorage.getItem("username");
@@ -96,6 +190,7 @@ const App = () => {
         }
       } catch {}
     }
+    
     // Fetch all clubs for tagging
     async function fetchAllClubs() {
       try {
@@ -106,60 +201,17 @@ const App = () => {
         }
       } catch {}
     }
+    
     if (isLoggedIn) {
       fetchAllUsers();
       fetchAllClubs();
     }
+  }, []);
 
-    async function fetchPosts() {
-      if (isLoggedIn) {
-        try {
-          const res = await fetch(API_URL);
-          const data = await res.json();
-          const postsWithDetails = await Promise.all(data.map(async item => {
-            const id = item.id || item._id;
-            // Fetch likes
-            let likes = 0;
-            let likedByUser = false;
-            try {
-              const resLikes = await fetch(`${API_URL}/${id}/likes`);
-              const likesArr = await resLikes.json();
-              likes = Array.isArray(likesArr) ? likesArr.length : 0;
-              likedByUser = Array.isArray(likesArr) && likesArr.includes(getUserId());
-            } catch {}
-            // Fetch comments
-            let comments = [];
-            try {
-              const resComments = await fetch(`${API_URL}/${id}/comments`);
-              comments = await resComments.json();
-            } catch {}
-            // Use new Post fields if present, fallback to old Item fields
-            const postUser = item.authorName || item.name || username;
-            const postUsername = (item.authorName || item.name || username).split(' ')[0]?.toLowerCase() || username;
-            return {
-              id,
-              user: postUser,
-              username: postUsername,
-              title: item.title || '',
-              tags: item.tags || [],
-              content: item.body || item.description || '',
-              timestamp: item.createdAt ? new Date(item.createdAt).toLocaleString() : "just now",
-              likes,
-              likedByUser,
-              avatar: `https://placehold.co/40x40/f59e0b/ffffff?text=${postUsername.charAt(0).toUpperCase()}`,
-              image: item.image || null,
-              comments,
-              commentInput: ""
-            };
-          }));
-          setPosts(postsWithDetails);
-        } catch {
-          setPosts([]);
-        }
-      }
-    }
+  // Refetch posts when sort/filter changes or when logged in
+  useEffect(() => {
     fetchPosts();
-  }, [isLoggedIn, username]);
+  }, [isLoggedIn, username, sortOption, filterTag]);
 
   // Real authentication with backend
   const handleAuth = async (e) => {
@@ -209,7 +261,6 @@ const App = () => {
           const user = await res.json();
           setPendingUser(user);
           setShowSignupDetails(true);
-          // Do not set isLoggedIn yet; wait for details or skip
           console.log("Signup successful, show details page");
         } catch (error) {
           alert("User already exists");
@@ -224,31 +275,10 @@ const App = () => {
     setPassword("");
     setName("");
     setUsername("");
-    // Clear localStorage
     localStorage.removeItem("isLoggedIn");
     localStorage.removeItem("username");
     localStorage.removeItem("user");
   };
-
-  // Add new post to backend
-  const handleAddPost = async (e) => {
-    // Legacy add post logic removed. Use modal/create post form only.
-    return;
-  };
-
-  // Helper to get userId from localStorage (simulate, fallback to username)
-  function getUserId() {
-    const user = localStorage.getItem("user");
-    if (user) {
-      try {
-        const parsed = JSON.parse(user);
-        return parsed.id || parsed._id || parsed.email || username;
-      } catch {
-        return username;
-      }
-    }
-    return username;
-  }
 
   // Like/unlike post using backend
   const handleLike = async (postId) => {
@@ -261,11 +291,12 @@ const App = () => {
       setPosts(posts => posts.map(post => {
         if (post.id !== postId) return post;
         const likesArr = updated.likes || [];
-        return {
+        const newPost = {
           ...post,
           likes: likesArr.length,
           likedByUser: likesArr.includes(getUserId())
         };
+        return newPost;
       }));
     } catch {}
   };
@@ -301,6 +332,7 @@ const App = () => {
   if (showSignupDetails && pendingUser) {
     return <SignupDetails onSubmit={handleSignupDetails} onSkip={handleSkipSignupDetails} />;
   }
+
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center p-4">
@@ -409,23 +441,60 @@ const App = () => {
             </div>
           </div>
         </header>
+
         <Routes>
           <Route path="/" element={
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Sidebar */}
                 <div className="lg:col-span-2 space-y-6">
+                  {/* Sorting/Filtering Controls */}
+                  <div className="flex flex-wrap gap-4 mb-6 items-center bg-white rounded-xl shadow-sm border p-4">
+                    <div>
+                      <label className="font-semibold text-gray-700 mr-2">Sort by:</label>
+                      <select 
+                        value={sortOption} 
+                        onChange={e => setSortOption(e.target.value)} 
+                        className="border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      >
+                        <option value="recent">Most Recent</option>
+                        <option value="likes">Most Liked</option>
+                        <option value="oldest">Oldest</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="font-semibold text-gray-700 mr-2">Filter by Tag:</label>
+                      <select 
+                        value={filterTag} 
+                        onChange={e => setFilterTag(e.target.value)} 
+                        className="border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      >
+                        <option value="">All Tags</option>
+                        {POST_TAGS.map(tag => (
+                          <option key={tag} value={tag}>{tag}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
                   {/* Create Post */}
                   <div className="bg-white rounded-xl shadow-sm border p-6">
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">Create a post</h2>
                     <button
                       className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium mb-2"
                       onClick={() => setShowCreatePost(true)}
-                    >Create Post</button>
+                    >
+                      Create Post
+                    </button>
                     {showCreatePost && (
                       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 relative">
-                          <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-2xl" onClick={() => setShowCreatePost(false)}>&times;</button>
+                          <button 
+                            className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-2xl" 
+                            onClick={() => setShowCreatePost(false)}
+                          >
+                            &times;
+                          </button>
                           <h3 className="text-xl font-bold mb-4 text-indigo-700">New Post</h3>
                           {postError && <div className="text-red-500 mb-2">{postError}</div>}
                           {postSuccess && <div className="text-green-600 mb-2">{postSuccess}</div>}
@@ -464,46 +533,12 @@ const App = () => {
                               setTimeout(() => {
                                 setShowCreatePost(false);
                                 setPostSuccess("");
+                                // Refresh posts after creating
+                                fetchPosts();
                               }, 1200);
                             } catch {
                               setPostError("Failed to create post. Please try again.");
                             }
-                            <>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Tag Users</label>
-                                <select
-                                  multiple
-                                  value={taggedUserIds}
-                                  onChange={e => {
-                                    const opts = Array.from(e.target.selectedOptions).map(o => o.value);
-                                    setTaggedUserIds(opts);
-                                  }}
-                                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                >
-                                  {allUsers.map(u => (
-                                    <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
-                                  ))}
-                                </select>
-                                <div className="text-xs text-gray-500 mt-1">Hold Ctrl (Windows) or Cmd (Mac) to select multiple</div>
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Tag Clubs</label>
-                                <select
-                                  multiple
-                                  value={taggedClubIds}
-                                  onChange={e => {
-                                    const opts = Array.from(e.target.selectedOptions).map(o => o.value);
-                                    setTaggedClubIds(opts);
-                                  }}
-                                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                >
-                                  {allClubs.map(c => (
-                                    <option key={c.id} value={c.id}>{c.name}</option>
-                                  ))}
-                                </select>
-                                <div className="text-xs text-gray-500 mt-1">Hold Ctrl (Windows) or Cmd (Mac) to select multiple</div>
-                              </div>
-                            </>
                           }} className="space-y-4">
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">Title<span className="text-red-500">*</span></label>
@@ -558,13 +593,16 @@ const App = () => {
                               <button
                                 type="submit"
                                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200"
-                              >Post</button>
+                              >
+                                Post
+                              </button>
                             </div>
                           </form>
                         </div>
                       </div>
                     )}
                   </div>
+
                   {/* Posts Feed */}
                   <div className="space-y-6">
                     {posts.map((post) => (
@@ -577,12 +615,12 @@ const App = () => {
                           />
                           <div className="flex-1">
                             <div className="flex items-center space-x-2">
-                              {/* User name links to profile */}
                               <Link to={`/profile/${encodeURIComponent(post.user)}`} className="font-semibold text-gray-900 hover:underline">{post.user}</Link>
                               <span className="text-sm text-gray-500">@{post.username}</span>
                               <span className="text-sm text-gray-400">•</span>
                               <span className="text-sm text-gray-500">{post.timestamp}</span>
                             </div>
+                            <h3 className="text-lg font-semibold text-gray-900 mt-1">{post.title}</h3>
                             {post.tags && post.tags.length > 0 && (
                               <div className="mb-2 flex flex-wrap gap-2">
                                 {post.tags.map((tag, idx) => (
@@ -652,6 +690,7 @@ const App = () => {
                     ))}
                   </div>
                 </div>
+
                 {/* Right Sidebar */}
                 <div className="space-y-6">
                   {/* Profile Card */}
@@ -667,6 +706,7 @@ const App = () => {
                       </div>
                     </div>
                   </div>
+
                   {/* Stats */}
                   <div className="bg-white rounded-xl shadow-sm border p-6">
                     <h3 className="font-semibold text-gray-900 mb-4">Statistics</h3>
@@ -683,6 +723,7 @@ const App = () => {
                       </div>
                     </div>
                   </div>
+
                   {/* Tips */}
                   <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 p-6">
                     <h3 className="font-semibold text-indigo-900 mb-2">Pro Tip</h3>
@@ -700,5 +741,6 @@ const App = () => {
       </div>
     </Router>
   );
-}
+};
+
 export default App;
