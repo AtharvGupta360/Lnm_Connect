@@ -2,10 +2,14 @@ package com.miniproject.backend.model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 @Document(collection = "posts")
 public class Post {
+    @JsonProperty("isApplyEnabled")
+    private boolean isApplyEnabled = false;
+    private java.util.List<String> applicationIds = new java.util.ArrayList<>();
     @Id
     private String id;
     private String title;
@@ -27,6 +31,11 @@ public class Post {
     public void setLikes(java.util.Set<String> likes) { this.likes = likes; }
     public java.util.List<Comment> getComments() { return comments; }
     public void setComments(java.util.List<Comment> comments) { this.comments = comments; }
+
+    public boolean isApplyEnabled() { return isApplyEnabled; }
+    public void setApplyEnabled(boolean applyEnabled) { isApplyEnabled = applyEnabled; }
+    public java.util.List<String> getApplicationIds() { return applicationIds == null ? new java.util.ArrayList<>() : applicationIds; }
+    public void setApplicationIds(java.util.List<String> applicationIds) { this.applicationIds = applicationIds; }
 
     public Post() {
         this.createdAt = System.currentTimeMillis();

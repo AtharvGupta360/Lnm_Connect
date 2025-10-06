@@ -2,6 +2,9 @@ package com.miniproject.backend.controller;
 
 import com.miniproject.backend.model.Post;
 import com.miniproject.backend.repository.PostRepository;
+import com.miniproject.backend.dto.PostResponseDTO;
+import com.miniproject.backend.service.ApplicationService;
+import java.util.ArrayList;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -55,6 +58,8 @@ public class PostController {
     }
     @Autowired
     private PostRepository postRepository;
+    @Autowired
+    private ApplicationService applicationService;
 
     @PostMapping
     public Post createPost(@RequestBody Post post) {
@@ -63,12 +68,13 @@ public class PostController {
     }
 
     @GetMapping
-    public List<Post> getAllPosts(
+    public List<PostResponseDTO> getAllPosts(
             @RequestParam(value = "sort", required = false) String sort,
             @RequestParam(value = "tag", required = false) String tag,
             @RequestParam(value = "author", required = false) String author,
             @RequestParam(value = "from", required = false) Long from,
-            @RequestParam(value = "to", required = false) Long to
+            @RequestParam(value = "to", required = false) Long to,
+            @RequestParam(value = "currentUserId", required = false) String currentUserId
     ) {
         List<Post> posts = postRepository.findAll();
         // Filter by tag
@@ -97,7 +103,11 @@ public class PostController {
         } else { // default or "recent"
             posts.sort((a, b) -> Long.compare(b.getCreatedAt(), a.getCreatedAt()));
         }
-        return posts;
+        List<PostResponseDTO> result = new ArrayList<>();
+        for (Post post : posts) {
+            result.add(applicationService.getPostWithApplyInfo(post, currentUserId));
+        }
+        return result;
     }
 
     @GetMapping("/user/{userId}")

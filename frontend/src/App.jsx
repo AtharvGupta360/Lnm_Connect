@@ -41,6 +41,7 @@ const App = () => {
   // State for tagging users and clubs in Create Post
   const [taggedUserIds, setTaggedUserIds] = useState([]);
   const [taggedClubIds, setTaggedClubIds] = useState([]);
+  const [postApplyEnabled, setPostApplyEnabled] = useState(false); // New state for apply feature
 
   // Handle extended signup details after signup
   const handleSignupDetails = async (details) => {
@@ -100,19 +101,17 @@ const App = () => {
   // Fetch posts function
   const fetchPosts = async () => {
     if (!isLoggedIn) return;
-    
     try {
-      // Build query params for tag filtering only
       const params = [];
       if (filterTag) params.push(`tag=${encodeURIComponent(filterTag)}`);
-      
+      params.push(`currentUserId=${encodeURIComponent(getUserId())}`);
       const url = params.length ? `${API_URL}?${params.join("&")}` : API_URL;
       const res = await fetch(url);
       const data = await res.json();
-      
-      const postsWithDetails = await Promise.all(data.map(async item => {
+      const postsWithDetails = await Promise.all(data.map(async dto => {
+        const item = dto.post || {};
         const id = item.id || item._id;
-        
+        const authorId = item.authorId || item.author_id || item.userId || item.user_id || item.id || item._id;
         // Fetch likes
         let likes = 0;
         let likedByUser = false;
@@ -122,18 +121,14 @@ const App = () => {
           likes = Array.isArray(likesArr) ? likesArr.length : 0;
           likedByUser = Array.isArray(likesArr) && likesArr.includes(getUserId());
         } catch {}
-        
         // Fetch comments
         let comments = [];
         try {
           const resComments = await fetch(`${API_URL}/${id}/comments`);
           comments = await resComments.json();
         } catch {}
-        
         const postUser = item.authorName || item.name || username;
         const postUsername = (item.authorName || item.name || username).split(' ')[0]?.toLowerCase() || username;
-        const authorId = item.authorId || item.author_id || item.userId || item.user_id || item.id || item._id;
-        
         return {
           id,
           authorId,
@@ -143,30 +138,32 @@ const App = () => {
           tags: item.tags || [],
           content: item.body || item.description || '',
           timestamp: item.createdAt ? new Date(item.createdAt).toLocaleString() : "just now",
-          createdAt: item.createdAt ? new Date(item.createdAt).getTime() : Date.now(), // For sorting
+          createdAt: item.createdAt ? new Date(item.createdAt).getTime() : Date.now(),
           likes,
           likedByUser,
           avatar: `https://placehold.co/40x40/f59e0b/ffffff?text=${postUsername.charAt(0).toUpperCase()}`,
           image: item.image || null,
           comments,
-          commentInput: ""
+          commentInput: "",
+          isApplyEnabled: item.isApplyEnabled || false,
+          canApply: dto.canApply,
+          hasApplied: dto.hasApplied,
+          applicants: dto.applicants || []
         };
       }));
-      
       // Apply sorting on frontend
       const sortedPosts = [...postsWithDetails].sort((a, b) => {
         switch (sortOption) {
           case "recent":
-            return b.createdAt - a.createdAt; // Most recent first
+            return b.createdAt - a.createdAt;
           case "likes":
-            return b.likes - a.likes; // Most liked first
+            return b.likes - a.likes;
           case "oldest":
-            return a.createdAt - b.createdAt; // Oldest first
+            return a.createdAt - b.createdAt;
           default:
             return b.createdAt - a.createdAt;
         }
       });
-      
       setPosts(sortedPosts);
     } catch {
       setPosts([]);
@@ -530,7 +527,8 @@ const App = () => {
                                   authorId: user && user.id,
                                   authorName: user && user.name,
                                   taggedUserIds,
-                                  taggedClubIds
+                                  taggedClubIds,
+                                  isApplyEnabled: postApplyEnabled
                                 })
                               });
                               if (!res.ok) throw new Error("Failed to create post");
@@ -541,6 +539,7 @@ const App = () => {
                               setPostImage("");
                               setTaggedUserIds([]);
                               setTaggedClubIds([]);
+                              setPostApplyEnabled(false);
                               setTimeout(() => {
                                 setShowCreatePost(false);
                                 setPostSuccess("");
@@ -600,6 +599,16 @@ const App = () => {
                                 placeholder="Image URL (optional)"
                               />
                             </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Enable Apply Feature</label>
+                              <input
+                                type="checkbox"
+                                checked={postApplyEnabled}
+                                onChange={e => setPostApplyEnabled(e.target.checked)}
+                                className="mr-2"
+                              />
+                              <span className="text-sm text-gray-600">Allow users to apply to this post</span>
+                            </div>
                             <div className="flex justify-end">
                               <button
                                 type="submit"
@@ -649,6 +658,18 @@ const App = () => {
                                 />
                               </div>
                             )}
+                            {/* --- APPLY FEATURE START --- */}
+                            {/* DEBUG: Show canApply, hasApplied, isApplyEnabled for troubleshooting */}
+                            <div className="text-xs text-gray-400 mb-1">
+                              <span>canApply: {String(post.canApply)} | hasApplied: {String(post.hasApplied)} | isApplyEnabled: {String(post.isApplyEnabled)} | authorId: {String(post.authorId)} | you: {String(getUserId())}</span>
+                            </div>
+                            {post.canApply && (
+                              <ApplyButton postId={post.id} userId={getUserId()} hasApplied={post.hasApplied} onApplied={fetchPosts} />
+                            )}
+                            {Array.isArray(post.applicants) && post.applicants.length > 0 && getUserId() === post.authorId && (
+                              <ApplicantList applicants={post.applicants} />
+                            )}
+                            {/* --- APPLY FEATURE END --- */}
                             <div className="flex items-center space-x-6 mt-4">
                               <button
                                 onClick={() => handleLike(post.id)}
@@ -755,3 +776,59 @@ const App = () => {
 };
 
 export default App;
+
+// --- APPLY BUTTON COMPONENT ---
+function ApplyButton({ postId, userId, onApplied, hasApplied }) {
+  const [applied, setApplied] = useState(hasApplied);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  useEffect(() => { setApplied(hasApplied); }, [hasApplied]);
+  const handleApply = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch(`http://localhost:8080/api/posts/${postId}/apply?userId=${userId}`, { method: 'POST' });
+      if (!res.ok) throw new Error(await res.text());
+      setApplied(true);
+      if (onApplied) onApplied();
+    } catch (e) {
+      setError(e.message || "Could not apply");
+      setApplied(true); // Prevent repeated attempts if already applied
+    }
+    setLoading(false);
+  };
+  if (applied) return <div className="mt-2 text-green-600 font-semibold">Applied!</div>;
+  return (
+    <div className="mt-2">
+      <button className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-60" onClick={handleApply} disabled={loading || applied}>Apply</button>
+      {error && <div className="text-red-500 text-xs mt-1">{error}</div>}
+    </div>
+  );
+}
+
+// --- APPLICANT LIST COMPONENT ---
+function ApplicantList({ applicants }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="mt-2">
+      <button className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded font-semibold" onClick={() => setShow(!show)}>
+        {show ? "Hide" : "Show"} Applicants
+      </button>
+      {show && (
+        <div className="mt-2 bg-slate-50 border rounded p-2 max-h-40 overflow-y-auto">
+          {applicants.length === 0 ? <div className="text-gray-400">No applicants yet.</div> : (
+            <ul>
+              {applicants.map(u => (
+                <li key={u.id} className="mb-1 flex items-center gap-2">
+                  <Link to={`/profile/${u.id}`} className="text-indigo-700 hover:underline font-semibold">{u.name}</Link>
+                  <span className="text-xs text-gray-500">{u.email}</span>
+                  {u.dateApplied && <span className="text-xs text-gray-400 ml-2">{new Date(u.dateApplied).toLocaleString()}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
