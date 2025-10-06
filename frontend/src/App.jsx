@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { CheckCircle, Loader2, Users, X, Eye } from "lucide-react";
 import SignupDetails from "./SignupDetails";
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from "react-router-dom";
 import ProfilePage from "./ProfilePage";
@@ -658,18 +660,11 @@ const App = () => {
                                 />
                               </div>
                             )}
-                            {/* --- APPLY FEATURE START --- */}
-                            {/* DEBUG: Show canApply, hasApplied, isApplyEnabled for troubleshooting */}
-                            <div className="text-xs text-gray-400 mb-1">
-                              <span>canApply: {String(post.canApply)} | hasApplied: {String(post.hasApplied)} | isApplyEnabled: {String(post.isApplyEnabled)} | authorId: {String(post.authorId)} | you: {String(getUserId())}</span>
-                            </div>
-                            {post.canApply && (
-                              <ApplyButton postId={post.id} userId={getUserId()} hasApplied={post.hasApplied} onApplied={fetchPosts} />
-                            )}
-                            {Array.isArray(post.applicants) && post.applicants.length > 0 && getUserId() === post.authorId && (
-                              <ApplicantList applicants={post.applicants} />
-                            )}
-                            {/* --- APPLY FEATURE END --- */}
+                            <PostCard
+                              post={post}
+                              currentUserId={getUserId()}
+                              onApplied={fetchPosts}
+                            />
                             <div className="flex items-center space-x-6 mt-4">
                               <button
                                 onClick={() => handleLike(post.id)}
@@ -777,12 +772,56 @@ const App = () => {
 
 export default App;
 
+// --- POST CARD COMPONENT ---
+function PostCard({ post, currentUserId, onApplied }) {
+  const [showApplicants, setShowApplicants] = useState(false);
+  const isOwner = post.authorId === currentUserId;
+  return (
+    <div className="relative">
+      {/* Main post content (title, tags, body, etc.) is already rendered above */}
+      {/* Apply Button or Applied State */}
+      {post.isApplyEnabled && !isOwner && (
+        <ApplyButton
+          postId={post.id}
+          userId={currentUserId}
+          hasApplied={post.hasApplied}
+          onApplied={onApplied}
+          applicantCount={Array.isArray(post.applicants) ? post.applicants.length : 0}
+        />
+      )}
+      {/* Owner: View Applicants Button */}
+      {isOwner && post.isApplyEnabled && (
+        <button
+          className="flex items-center gap-2 mt-2 px-4 py-2 rounded-lg bg-blue-50 text-blue-700 font-semibold border border-blue-200 hover:bg-blue-100 transition"
+          onClick={() => setShowApplicants(true)}
+        >
+          <Users className="w-5 h-5" />
+          View Applicants
+          {Array.isArray(post.applicants) && post.applicants.length > 0 && (
+            <span className="ml-2 bg-blue-200 text-blue-800 rounded-full px-2 py-0.5 text-xs font-bold">{post.applicants.length}</span>
+          )}
+        </button>
+      )}
+      <AnimatePresence>
+        {showApplicants && (
+          <ApplicantsModal
+            applicants={post.applicants || []}
+            onClose={() => setShowApplicants(false)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // --- APPLY BUTTON COMPONENT ---
-function ApplyButton({ postId, userId, onApplied, hasApplied }) {
+function ApplyButton({ postId, userId, hasApplied, onApplied, applicantCount }) {
   const [applied, setApplied] = useState(hasApplied);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [showConfirm, setShowConfirm] = useState(false);
   useEffect(() => { setApplied(hasApplied); }, [hasApplied]);
+
   const handleApply = async () => {
     setError("");
     setLoading(true);
@@ -791,19 +830,150 @@ function ApplyButton({ postId, userId, onApplied, hasApplied }) {
       if (!res.ok) throw new Error(await res.text());
       setApplied(true);
       if (onApplied) onApplied();
+      toast("Application submitted successfully!", "success");
     } catch (e) {
       setError(e.message || "Could not apply");
-      setApplied(true); // Prevent repeated attempts if already applied
+      toast(e.message || "Could not apply", "error");
     }
     setLoading(false);
+    setShowConfirm(false);
   };
-  if (applied) return <div className="mt-2 text-green-600 font-semibold">Applied!</div>;
+
   return (
-    <div className="mt-2">
-      <button className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-60" onClick={handleApply} disabled={loading || applied}>Apply</button>
-      {error && <div className="text-red-500 text-xs mt-1">{error}</div>}
+    <div className="mt-2 flex items-center gap-2">
+      {applied ? (
+        <button
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-500 font-semibold border border-gray-200 cursor-not-allowed"
+          disabled
+        >
+          <CheckCircle className="w-5 h-5 text-green-500" />
+          Applied <span className="ml-1">✅</span>
+        </button>
+      ) : (
+        <>
+          <button
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            onClick={() => setShowConfirm(true)}
+            disabled={loading}
+          >
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Eye className="w-5 h-5" />}
+            Apply
+            {typeof applicantCount === 'number' && (
+              <span className="ml-2 bg-blue-200 text-blue-800 rounded-full px-2 py-0.5 text-xs font-bold">{applicantCount} applicants</span>
+            )}
+          </button>
+          <AnimatePresence>
+            {showConfirm && (
+              <motion.div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <motion.div
+                  className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 relative flex flex-col items-center"
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                >
+                  <X className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 cursor-pointer" onClick={() => setShowConfirm(false)} />
+                  <Eye className="w-12 h-12 text-blue-600 mb-2" />
+                  <h3 className="text-lg font-bold mb-2 text-gray-900">Apply for this opportunity?</h3>
+                  <p className="text-gray-600 mb-4 text-center">Are you sure you want to apply for this opportunity? This action cannot be undone.</p>
+                  <div className="flex gap-4 mt-2">
+                    <button
+                      className="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300 transition"
+                      onClick={() => setShowConfirm(false)}
+                      disabled={loading}
+                    >Cancel</button>
+                    <button
+                      className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 transition-all duration-200"
+                      onClick={handleApply}
+                      disabled={loading}
+                    >
+                      {loading ? <Loader2 className="w-5 h-5 animate-spin inline-block" /> : "Confirm & Apply"}
+                    </button>
+                  </div>
+                  {error && <div className="text-red-500 text-xs mt-2">{error}</div>}
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
+      )}
     </div>
   );
+}
+
+// --- APPLICANTS MODAL COMPONENT ---
+function ApplicantsModal({ applicants, onClose }) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 relative"
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+      >
+        <button className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl" onClick={onClose}>
+          <X />
+        </button>
+        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 text-blue-700">
+          <Users className="w-7 h-7" /> Applicants
+        </h2>
+        {applicants.length === 0 ? (
+          <div className="text-gray-400 text-center">No applicants yet.</div>
+        ) : (
+          <ul className="space-y-3">
+            {applicants.map(u => (
+              <li key={u.id} className="flex items-center gap-4 bg-blue-50 rounded-lg p-3 hover:bg-blue-100 transition">
+                <div className="flex-shrink-0">
+                  <img
+                    src={`https://api.dicebear.com/7.x/identicon/svg?seed=${u.id}`}
+                    alt={u.name}
+                    className="w-10 h-10 rounded-full border border-blue-200"
+                  />
+                </div>
+                <div className="flex-1">
+                  <div className="font-semibold text-blue-900">{u.name}</div>
+                  <div className="text-xs text-blue-700">{u.email}</div>
+                  <div className="text-xs text-gray-500">Applied: {u.dateApplied ? new Date(u.dateApplied).toLocaleString() : "-"}</div>
+                </div>
+                <a
+                  href={`/profile/${u.id}`}
+                  className="px-3 py-1 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition"
+                  target="_blank" rel="noopener noreferrer"
+                >
+                  View Profile
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// --- TOAST/NOTIFICATION ---
+function toast(message, type = "info") {
+  const id = `toast-${Date.now()}`;
+  const color = type === "success" ? "bg-green-600" : type === "error" ? "bg-red-600" : "bg-blue-600";
+  const icon = type === "success" ? <CheckCircle className="w-5 h-5 mr-2" /> : type === "error" ? <X className="w-5 h-5 mr-2" /> : <Loader2 className="w-5 h-5 mr-2" />;
+  const toastDiv = document.createElement("div");
+  toastDiv.id = id;
+  toastDiv.className = `fixed top-6 right-6 z-[9999] flex items-center gap-2 px-5 py-3 rounded-lg shadow-lg text-white font-semibold text-sm ${color} animate-fade-in`;
+  toastDiv.innerHTML = `<span>${icon.props.children ? icon.props.children : ''}</span>${message}`;
+  document.body.appendChild(toastDiv);
+  setTimeout(() => {
+    toastDiv.classList.add("animate-fade-out");
+    setTimeout(() => { document.body.removeChild(toastDiv); }, 400);
+  }, 2500);
 }
 
 // --- APPLICANT LIST COMPONENT ---
