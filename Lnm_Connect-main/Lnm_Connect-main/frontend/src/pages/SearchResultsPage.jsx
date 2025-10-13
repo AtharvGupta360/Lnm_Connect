@@ -255,8 +255,10 @@ const ProfileCard = ({ result }) => {
           </Link>
           {currentUser && currentUser.id !== result.id && (
             <MessageButton 
-              recipientId={result.id}
-              recipientName={result.title}
+              targetUserId={result.id}
+              targetUserName={result.title}
+              targetUserPhotoUrl={result.imageUrl}
+              className="text-sm"
             />
           )}
         </div>
