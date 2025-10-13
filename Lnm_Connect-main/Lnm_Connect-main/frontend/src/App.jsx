@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle, Loader2, Users, X, Eye, MessageCircle } from "lucide-react";
+import { CheckCircle, Loader2, Users, X, Eye, MessageCircle, Home, UserCircle, Mail, LogOut, Sparkles } from "lucide-react";
 import SignupDetails from "./SignupDetails";
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from "react-router-dom";
 import ProfilePage from "./ProfilePage";
 import ChatPage from "./pages/ChatPage";
 
@@ -15,6 +15,116 @@ const POST_TAGS = [
   "Project Collaboration", "Open Source", "Startup", "Club Announcement",
   "Competition", "Volunteering", "Technical Blog", "Achievement", "Miscellaneous"
 ];
+
+// Professional Header Navigation Component
+const HeaderNav = ({ username, handleLogout }) => {
+  const location = useLocation();
+  
+  const isActive = (path) => {
+    return location.pathname === path;
+  };
+
+  const navLinks = [
+    { path: '/', label: 'Home', icon: Home },
+    { path: '/profile', label: 'My Profile', icon: UserCircle },
+    { path: '/chat', label: 'Messages', icon: MessageCircle }
+  ];
+
+  return (
+    <motion.header 
+      initial={{ y: -100 }}
+      animate={{ y: 0 }}
+      className="bg-white/80 backdrop-blur-md shadow-lg border-b border-gray-200 sticky top-0 z-50"
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          {/* Logo */}
+          <Link to="/" className="flex items-center space-x-2 group">
+            <motion.div
+              whileHover={{ rotate: 360 }}
+              transition={{ duration: 0.5 }}
+            >
+              <Sparkles className="w-8 h-8 text-indigo-600" />
+            </motion.div>
+            <span className="text-2xl font-extrabold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+              LNMConnect
+            </span>
+          </Link>
+
+          {/* Navigation Links */}
+          <nav className="hidden md:flex items-center space-x-1">
+            {navLinks.map(({ path, label, icon: Icon }) => (
+              <Link
+                key={path}
+                to={path}
+                className="relative group"
+              >
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                    isActive(path)
+                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-indigo-600'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="font-semibold">{label}</span>
+                </motion.div>
+                {isActive(path) && (
+                  <motion.div
+                    layoutId="activeTab"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-600 to-purple-600"
+                    initial={false}
+                  />
+                )}
+              </Link>
+            ))}
+          </nav>
+
+          {/* User Info & Logout */}
+          <div className="flex items-center space-x-4">
+            <div className="hidden sm:flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-full border border-indigo-200">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-sm font-medium text-gray-700">
+                {username}
+              </span>
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleLogout}
+              className="flex items-center space-x-2 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-md transition-all duration-200"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Logout</span>
+            </motion.button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Navigation */}
+      <div className="md:hidden border-t border-gray-200 bg-white">
+        <nav className="flex justify-around py-2">
+          {navLinks.map(({ path, label, icon: Icon }) => (
+            <Link
+              key={path}
+              to={path}
+              className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors ${
+                isActive(path)
+                  ? 'text-indigo-600'
+                  : 'text-gray-600 hover:text-indigo-600'
+              }`}
+            >
+              <Icon className="w-5 h-5" />
+              <span className="text-xs font-medium">{label}</span>
+            </Link>
+          ))}
+        </nav>
+      </div>
+    </motion.header>
+  );
+};
 
 const App = () => {
   // Sorting/filtering state
@@ -109,8 +219,14 @@ const App = () => {
       if (filterTag) params.push(`tag=${encodeURIComponent(filterTag)}`);
       params.push(`currentUserId=${encodeURIComponent(getUserId())}`);
       const url = params.length ? `${API_URL}?${params.join("&")}` : API_URL;
+      console.log('Fetching posts from:', url);
       const res = await fetch(url);
+      if (!res.ok) {
+        console.error('Failed to fetch posts:', res.status, res.statusText);
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
       const data = await res.json();
+      console.log('Posts fetched successfully:', data.length, 'posts');
       const postsWithDetails = await Promise.all(data.map(async dto => {
         const item = dto.post || {};
         const id = item.id || item._id;
@@ -168,7 +284,9 @@ const App = () => {
         }
       });
       setPosts(sortedPosts);
-    } catch {
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+      alert(`Failed to load posts: ${error.message}\n\nPlease check:\n1. Backend server is running on port 8080\n2. Database connection is working\n3. Check browser console for details`);
       setPosts([]);
     }
   };
@@ -425,38 +543,9 @@ const App = () => {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <header className="bg-white shadow-sm border-b">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <Link to="/" className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                    LNMConnect
-                  </Link>
-                </div>
-                <nav className="ml-8 space-x-4">
-                  <Link to="/" className="text-gray-600 hover:text-indigo-600 font-semibold transition-colors">Home</Link>
-                  <Link to="/profile" className="text-gray-600 hover:text-indigo-600 font-semibold transition-colors">My Profile</Link>
-                  <Link to="/chat" className="text-gray-600 hover:text-indigo-600 font-semibold transition-colors flex items-center gap-1">
-                    <MessageCircle className="w-4 h-4" />
-                    Messages
-                  </Link>
-                </nav>
-              </div>
-              <div className="flex items-center space-x-4">
-                <span className="text-sm text-gray-600">Welcome, {username}!</span>
-                <button
-                  onClick={handleLogout}
-                  className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
-                >
-                  Logout
-                </button>
-              </div>
-            </div>
-          </div>
-        </header>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+        {/* Enhanced Header */}
+        <HeaderNav username={username} handleLogout={handleLogout} />
 
         <Routes>
           <Route path="/" element={
@@ -465,25 +554,29 @@ const App = () => {
                 {/* Left Sidebar */}
                 <div className="lg:col-span-2 space-y-6">
                   {/* Sorting/Filtering Controls */}
-                  <div className="flex flex-wrap gap-4 mb-6 items-center bg-white rounded-xl shadow-sm border p-4">
-                    <div>
-                      <label className="font-semibold text-gray-700 mr-2">Sort by:</label>
+                  <motion.div 
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex flex-wrap gap-4 mb-6 items-center bg-white rounded-xl shadow-md border border-gray-200 p-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <label className="font-semibold text-gray-700">Sort by:</label>
                       <select 
                         value={sortOption} 
                         onChange={e => setSortOption(e.target.value)} 
-                        className="border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white hover:border-indigo-400"
                       >
-                        <option value="recent">Most Recent</option>
-                        <option value="likes">Most Liked</option>
-                        <option value="oldest">Oldest</option>
+                        <option value="recent">🕐 Most Recent</option>
+                        <option value="likes">❤️ Most Liked</option>
+                        <option value="oldest">📅 Oldest</option>
                       </select>
                     </div>
-                    <div>
-                      <label className="font-semibold text-gray-700 mr-2">Filter by Tag:</label>
+                    <div className="flex items-center space-x-2">
+                      <label className="font-semibold text-gray-700">Filter by Tag:</label>
                       <select 
                         value={filterTag} 
                         onChange={e => setFilterTag(e.target.value)} 
-                        className="border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white hover:border-indigo-400"
                       >
                         <option value="">All Tags</option>
                         {POST_TAGS.map(tag => (
@@ -491,18 +584,31 @@ const App = () => {
                         ))}
                       </select>
                     </div>
-                  </div>
+                  </motion.div>
 
                   {/* Create Post */}
-                  <div className="bg-white rounded-xl shadow-sm border p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Create a post</h2>
-                    <button
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium mb-2"
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="bg-gradient-to-br from-white to-indigo-50 rounded-xl shadow-lg border-2 border-indigo-200 p-6 hover:shadow-xl transition-shadow"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                        Share Your Thoughts
+                      </h2>
+                      <Sparkles className="w-6 h-6 text-indigo-600" />
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center space-x-2"
                       onClick={() => setShowCreatePost(true)}
                     >
-                      Create Post
-                    </button>
-                    {showCreatePost && (
+                      <span>✨ Create Post</span>
+                    </motion.button>
+                  </motion.div>
+                  
+                  {showCreatePost && (
                       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 relative">
                           <button 
@@ -629,40 +735,56 @@ const App = () => {
                         </div>
                       </div>
                     )}
-                  </div>
 
                   {/* Posts Feed */}
                   <div className="space-y-6">
                     {posts.map((post) => (
-                      <div key={post.id} className="bg-white rounded-xl shadow-sm border p-6">
+                      <motion.div 
+                        key={post.id} 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 border border-gray-200 hover:border-indigo-200 p-6 transform hover:-translate-y-1"
+                      >
                         <div className="flex items-start space-x-3">
-                          <img
+                          <motion.img
+                            whileHover={{ scale: 1.1 }}
                             src={post.avatar}
                             alt={post.user}
-                            className="w-10 h-10 rounded-full flex-shrink-0"
+                            className="w-12 h-12 rounded-full flex-shrink-0 ring-2 ring-indigo-100"
                           />
                           <div className="flex-1">
-                            <div className="flex items-center space-x-2">
-                              <Link to={`/profile/${post.authorId || post.id}`} className="font-semibold text-gray-900 hover:underline">{post.user}</Link>
+                            <div className="flex items-center space-x-2 mb-1">
+                              <Link 
+                                to={`/profile/${post.authorId || post.id}`} 
+                                className="font-bold text-gray-900 hover:text-indigo-600 transition-colors"
+                              >
+                                {post.user}
+                              </Link>
                               <span className="text-sm text-gray-500">@{post.username}</span>
                               <span className="text-sm text-gray-400">•</span>
                               <span className="text-sm text-gray-500">{post.timestamp}</span>
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-900 mt-1">{post.title}</h3>
+                            <h3 className="text-xl font-bold text-gray-900 mt-2 mb-2">{post.title}</h3>
                             {post.tags && post.tags.length > 0 && (
-                              <div className="mb-2 flex flex-wrap gap-2">
+                              <div className="mb-3 flex flex-wrap gap-2">
                                 {post.tags.map((tag, idx) => (
-                                  <span key={idx} className="font-bold text-indigo-700 bg-indigo-100 px-2 py-1 rounded-full text-xs uppercase tracking-wide border border-indigo-300">#{tag}</span>
+                                  <motion.span 
+                                    key={idx}
+                                    whileHover={{ scale: 1.05 }}
+                                    className="font-semibold text-indigo-700 bg-gradient-to-r from-indigo-50 to-purple-50 px-3 py-1.5 rounded-full text-xs uppercase tracking-wide border border-indigo-200 hover:border-indigo-400 transition-colors"
+                                  >
+                                    #{tag}
+                                  </motion.span>
                                 ))}
                               </div>
                             )}
-                            <p className="text-gray-800 mt-2 whitespace-pre-wrap">{post.content}</p>
+                            <p className="text-gray-700 mt-3 leading-relaxed whitespace-pre-wrap">{post.content}</p>
                             {post.image && (
-                              <div className="mt-3 rounded-lg overflow-hidden">
+                              <div className="mt-4 rounded-xl overflow-hidden shadow-md">
                                 <img
                                   src={post.image}
                                   alt="Post content"
-                                  className="w-full h-auto object-cover rounded-lg"
+                                  className="w-full h-auto object-cover rounded-xl hover:scale-105 transition-transform duration-300"
                                 />
                               </div>
                             )}
@@ -671,55 +793,69 @@ const App = () => {
                               currentUserId={getUserId()}
                               onApplied={fetchPosts}
                             />
-                            <div className="flex items-center space-x-6 mt-4">
-                              <button
+                            <div className="flex items-center space-x-6 mt-4 pt-4 border-t border-gray-100">
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
                                 onClick={() => handleLike(post.id)}
-                                className={`flex items-center space-x-1 ${post.likedByUser ? 'text-red-500' : 'text-gray-500'} hover:text-red-500 transition-colors duration-200`}
+                                className={`flex items-center space-x-2 ${post.likedByUser ? 'text-red-500' : 'text-gray-500'} hover:text-red-500 transition-colors duration-200 font-medium`}
                               >
-                                <svg className="w-5 h-5" fill={post.likedByUser ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-6 h-6" fill={post.likedByUser ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                                 </svg>
-                                <span className="text-sm font-medium">{post.likes}</span>
-                              </button>
+                                <span className="text-sm font-semibold">{post.likes}</span>
+                              </motion.button>
                             </div>
                             {/* Comments Section */}
-                            <div className="mt-4">
-                              <div className="mb-2 font-semibold text-gray-700">Comments</div>
-                              <div className="space-y-2 max-h-32 overflow-y-auto">
+                            <div className="mt-4 pt-4 border-t border-gray-100">
+                              <div className="mb-3 font-bold text-gray-800 flex items-center space-x-2">
+                                <MessageCircle className="w-5 h-5 text-indigo-600" />
+                                <span>Comments</span>
+                              </div>
+                              <div className="space-y-3 max-h-40 overflow-y-auto">
                                 {post.comments && post.comments.length > 0 ? post.comments.map((c, idx) => (
-                                  <div key={idx} className="flex items-start space-x-2">
-                                    <div className="w-8 h-8 bg-indigo-200 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xs">
+                                  <motion.div 
+                                    key={idx}
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    className="flex items-start space-x-3 bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors"
+                                  >
+                                    <div className="w-8 h-8 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
                                       {c.userName ? c.userName.charAt(0).toUpperCase() : '?'}
                                     </div>
-                                    <div>
-                                      <span className="font-medium text-gray-800 text-sm">{c.userName || 'User'}</span>
-                                      <span className="ml-2 text-xs text-gray-400">{new Date(c.timestamp).toLocaleString()}</span>
-                                      <div className="text-gray-700 text-sm">{c.text}</div>
+                                    <div className="flex-1">
+                                      <div className="flex items-center space-x-2">
+                                        <span className="font-semibold text-gray-900 text-sm">{c.userName || 'User'}</span>
+                                        <span className="text-xs text-gray-400">{new Date(c.timestamp).toLocaleString()}</span>
+                                      </div>
+                                      <div className="text-gray-700 text-sm mt-1">{c.text}</div>
                                     </div>
-                                  </div>
-                                )) : <div className="text-gray-400 text-sm">No comments yet.</div>}
+                                  </motion.div>
+                                )) : <div className="text-gray-400 text-sm italic text-center py-2">No comments yet. Be the first to comment!</div>}
                               </div>
                               {/* Add comment input */}
-                              <div className="flex items-center mt-2 space-x-2">
+                              <div className="flex items-center mt-4 space-x-2">
                                 <input
                                   type="text"
                                   value={post.commentInput || ""}
                                   onChange={e => setPosts(posts => posts.map(p => p.id === post.id ? { ...p, commentInput: e.target.value } : p))}
-                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                  placeholder="Add a comment..."
+                                  className="flex-1 px-4 py-2.5 border-2 border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all hover:border-indigo-300"
+                                  placeholder="✍️ Add a comment..."
                                 />
-                                <button
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
                                   onClick={() => handleAddComment(post.id)}
-                                  className="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                                  className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-200"
                                   disabled={!post.commentInput || !post.commentInput.trim()}
                                 >
-                                  Comment
-                                </button>
+                                  Post
+                                </motion.button>
                               </div>
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </motion.div>
                     ))}
                   </div>
                 </div>
