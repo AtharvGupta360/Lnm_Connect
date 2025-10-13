@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, Loader2, Users, X, Eye, MessageCircle, Home, UserCircle, Mail, LogOut, Sparkles } from "lucide-react";
 import SignupDetails from "./SignupDetails";
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import ProfilePage from "./ProfilePage";
 import ChatPage from "./pages/ChatPage";
+import SearchResultsPage from "./pages/SearchResultsPage";
+import SearchBar from "./components/SearchBar";
 
 // Backend API URL
 const API_URL = "http://localhost:8080/api/posts";
@@ -37,22 +39,27 @@ const HeaderNav = ({ username, handleLogout }) => {
       className="bg-white/80 backdrop-blur-md shadow-lg border-b border-gray-200 sticky top-0 z-50"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center gap-4 h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2 group">
+          <Link to="/" className="flex items-center space-x-2 group flex-shrink-0">
             <motion.div
               whileHover={{ rotate: 360 }}
               transition={{ duration: 0.5 }}
             >
               <Sparkles className="w-8 h-8 text-indigo-600" />
             </motion.div>
-            <span className="text-2xl font-extrabold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+            <span className="text-xl md:text-2xl font-extrabold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent hidden sm:inline">
               LNMConnect
             </span>
           </Link>
 
+          {/* Search Bar - Desktop */}
+          <div className="hidden md:block flex-1 max-w-2xl">
+            <SearchBar />
+          </div>
+
           {/* Navigation Links */}
-          <nav className="hidden md:flex items-center space-x-1">
+          <nav className="hidden lg:flex items-center space-x-1 flex-shrink-0">
             {navLinks.map(({ path, label, icon: Icon }) => (
               <Link
                 key={path}
@@ -62,14 +69,14 @@ const HeaderNav = ({ username, handleLogout }) => {
                 <motion.div
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 ${
                     isActive(path)
                       ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
                       : 'text-gray-600 hover:bg-gray-100 hover:text-indigo-600'
                   }`}
                 >
-                  <Icon className="w-5 h-5" />
-                  <span className="font-semibold">{label}</span>
+                  <Icon className="w-4 h-4" />
+                  <span className="font-semibold text-sm">{label}</span>
                 </motion.div>
                 {isActive(path) && (
                   <motion.div
@@ -83,8 +90,8 @@ const HeaderNav = ({ username, handleLogout }) => {
           </nav>
 
           {/* User Info & Logout */}
-          <div className="flex items-center space-x-4">
-            <div className="hidden sm:flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-full border border-indigo-200">
+          <div className="flex items-center space-x-2 flex-shrink-0">
+            <div className="hidden lg:flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-full border border-indigo-200">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
               <span className="text-sm font-medium text-gray-700">
                 {username}
@@ -94,17 +101,22 @@ const HeaderNav = ({ username, handleLogout }) => {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleLogout}
-              className="flex items-center space-x-2 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-md transition-all duration-200"
+              className="flex items-center space-x-2 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold shadow-md transition-all duration-200"
             >
               <LogOut className="w-4 h-4" />
-              <span>Logout</span>
+              <span className="hidden sm:inline">Logout</span>
             </motion.button>
           </div>
+        </div>
+
+        {/* Search Bar - Mobile */}
+        <div className="md:hidden pb-3">
+          <SearchBar isCompact />
         </div>
       </div>
 
       {/* Mobile Navigation */}
-      <div className="md:hidden border-t border-gray-200 bg-white">
+      <div className="lg:hidden border-t border-gray-200 bg-white">
         <nav className="flex justify-around py-2">
           {navLinks.map(({ path, label, icon: Icon }) => (
             <Link
@@ -124,6 +136,31 @@ const HeaderNav = ({ username, handleLogout }) => {
       </div>
     </motion.header>
   );
+};
+
+// HomeContent Component - wraps homepage content with scroll-to-post functionality
+const HomeContent = ({ children, posts, postRefs, highlightedPost }) => {
+  const [searchParams] = useSearchParams();
+
+  // Scroll to post when postId is in URL
+  useEffect(() => {
+    const postId = searchParams.get('postId');
+    if (postId && posts.length > 0) {
+      // Wait a bit for posts to render
+      const timer = setTimeout(() => {
+        const element = postRefs.current[postId];
+        if (element) {
+          element.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, posts, postRefs]);
+
+  return children;
 };
 
 const App = () => {
@@ -155,6 +192,10 @@ const App = () => {
   const [taggedUserIds, setTaggedUserIds] = useState([]);
   const [taggedClubIds, setTaggedClubIds] = useState([]);
   const [postApplyEnabled, setPostApplyEnabled] = useState(false); // New state for apply feature
+  
+  // Refs for scrolling to specific posts
+  const postRefs = useRef({});
+  const [highlightedPost, setHighlightedPost] = useState(null);
 
   // Handle extended signup details after signup
   const handleSignupDetails = async (details) => {
@@ -270,8 +311,17 @@ const App = () => {
           applicants: dto.applicants || []
         };
       }));
+      // Remove duplicates based on post.id
+      const uniquePosts = postsWithDetails.reduce((acc, current) => {
+        const exists = acc.find(post => post.id === current.id);
+        if (!exists) {
+          acc.push(current);
+        }
+        return acc;
+      }, []);
+
       // Apply sorting on frontend
-      const sortedPosts = [...postsWithDetails].sort((a, b) => {
+      const sortedPosts = [...uniquePosts].sort((a, b) => {
         switch (sortOption) {
           case "recent":
             return b.createdAt - a.createdAt;
@@ -549,10 +599,11 @@ const App = () => {
 
         <Routes>
           <Route path="/" element={
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Left Sidebar */}
-                <div className="lg:col-span-2 space-y-6">
+            <HomeContent posts={posts} postRefs={postRefs} highlightedPost={highlightedPost}>
+              <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  {/* Left Sidebar */}
+                  <div className="lg:col-span-2 space-y-6">
                   {/* Sorting/Filtering Controls */}
                   <motion.div 
                     initial={{ opacity: 0, y: -20 }}
@@ -740,10 +791,13 @@ const App = () => {
                   <div className="space-y-6">
                     {posts.map((post) => (
                       <motion.div 
-                        key={post.id} 
+                        key={post.id}
+                        ref={(el) => (postRefs.current[post.id] = el)}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 border border-gray-200 hover:border-indigo-200 p-6 transform hover:-translate-y-1"
+                        className={`bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 border p-6 transform hover:-translate-y-1 ${
+                          highlightedPost === post.id ? 'border-4 border-indigo-500 ring-4 ring-indigo-200' : 'border-gray-200 hover:border-indigo-200'
+                        }`}
                       >
                         <div className="flex items-start space-x-3">
                           <motion.img
@@ -903,7 +957,9 @@ const App = () => {
                 </div>
               </div>
             </div>
+            </HomeContent>
           } />
+          <Route path="/search" element={<SearchResultsPage />} />
           <Route path="/profile" element={<ProfilePage currentUser={getCurrentUser()} />} />
           <Route path="/profile/:userId" element={<ProfilePage currentUser={getCurrentUser()} />} />
           <Route path="/chat" element={<ChatPage />} />
