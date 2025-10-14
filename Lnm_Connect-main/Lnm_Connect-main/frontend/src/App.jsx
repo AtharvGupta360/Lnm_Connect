@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle, Loader2, Users, X, Eye, MessageCircle, Home, UserCircle, Mail, LogOut, Sparkles } from "lucide-react";
+import { CheckCircle, Loader2, Users, X, Eye, MessageCircle, Home, UserCircle, Mail, LogOut, Sparkles, UserCheck, Bell } from "lucide-react";
 import SignupDetails from "./SignupDetails";
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import ProfilePage from "./ProfilePage";
 import ChatPage from "./pages/ChatPage";
 import SearchResultsPage from "./pages/SearchResultsPage";
+import MyNetworkPage from "./pages/MyNetworkPage";
+import ConnectionRequestsPage from "./pages/ConnectionRequestsPage";
 import SearchBar from "./components/SearchBar";
+import { followService } from "./services/followService";
 
 // Backend API URL
 const API_URL = "http://localhost:8080/api/posts";
@@ -21,13 +24,37 @@ const POST_TAGS = [
 // Professional Header Navigation Component
 const HeaderNav = ({ username, handleLogout }) => {
   const location = useLocation();
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   
   const isActive = (path) => {
     return location.pathname === path;
   };
 
+  // Load pending requests count
+  useEffect(() => {
+    const loadPendingRequests = async () => {
+      try {
+        const user = localStorage.getItem('user');
+        if (user) {
+          const currentUser = JSON.parse(user);
+          const requests = await followService.getPendingRequests(currentUser.id);
+          setPendingRequestsCount(requests.length);
+        }
+      } catch (error) {
+        console.error('Error loading pending requests:', error);
+      }
+    };
+
+    loadPendingRequests();
+    
+    // Refresh every 30 seconds
+    const interval = setInterval(loadPendingRequests, 30000);
+    return () => clearInterval(interval);
+  }, [location.pathname]); // Reload when navigation changes
+
   const navLinks = [
     { path: '/', label: 'Home', icon: Home },
+    { path: '/network', label: 'My Network', icon: UserCheck, badge: pendingRequestsCount },
     { path: '/profile', label: 'My Profile', icon: UserCircle },
     { path: '/chat', label: 'Messages', icon: MessageCircle }
   ];
@@ -60,7 +87,7 @@ const HeaderNav = ({ username, handleLogout }) => {
 
           {/* Navigation Links */}
           <nav className="hidden lg:flex items-center space-x-1 flex-shrink-0">
-            {navLinks.map(({ path, label, icon: Icon }) => (
+            {navLinks.map(({ path, label, icon: Icon, badge }) => (
               <Link
                 key={path}
                 to={path}
@@ -77,6 +104,15 @@ const HeaderNav = ({ username, handleLogout }) => {
                 >
                   <Icon className="w-4 h-4" />
                   <span className="font-semibold text-sm">{label}</span>
+                  {badge > 0 && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg"
+                    >
+                      {badge > 9 ? '9+' : badge}
+                    </motion.span>
+                  )}
                 </motion.div>
                 {isActive(path) && (
                   <motion.div
@@ -960,6 +996,8 @@ const App = () => {
             </HomeContent>
           } />
           <Route path="/search" element={<SearchResultsPage />} />
+          <Route path="/network" element={<MyNetworkPage />} />
+          <Route path="/network/requests" element={<ConnectionRequestsPage />} />
           <Route path="/profile" element={<ProfilePage currentUser={getCurrentUser()} />} />
           <Route path="/profile/:userId" element={<ProfilePage currentUser={getCurrentUser()} />} />
           <Route path="/chat" element={<ChatPage />} />

@@ -1,9 +1,11 @@
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\controller\SearchController.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\controller\CertificateController.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\dto\SearchResponseDTO.java
+C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\dto\UserConnectionDTO.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\repository\MessageRepository.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\controller\ProfileController.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\controller\ChatController.java
+C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\model\Follow.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\model\User.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\repository\CertificateRepository.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\service\ApplicationService.java
@@ -13,12 +15,16 @@ C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Conn
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\model\Application.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\service\SearchService.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\controller\PostController.java
+C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\dto\FollowStatusDTO.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\model\Club.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\model\Item.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\repository\PostRepository.java
+C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\controller\FollowController.java
+C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\service\FollowService.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\model\Certificate.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\dto\MessageDTO.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\config\SecurityConfig.java
+C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\dto\FollowRequestDTO.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\repository\ItemRepository.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\model\Message.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\controller\ItemController.java
@@ -33,6 +39,7 @@ C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Conn
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\dto\SendMessageRequest.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\model\Post.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\repository\ApplicationRepository.java
+C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\repository\FollowRepository.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\service\ChatService.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\controller\ApplicationController.java
 C:\Users\gupta\OneDrive\Desktop\LNMConnect\Lnm_Connect\Lnm_Connect-main\Lnm_Connect-main\backend\src\main\java\com\miniproject\backend\dto\PostResponseDTO.java

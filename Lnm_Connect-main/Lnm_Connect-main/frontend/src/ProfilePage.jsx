@@ -4,6 +4,7 @@ import { ensureArray } from "./utils";
 import { motion } from "framer-motion";
 import { FaUserCircle, FaGraduationCap, FaPhone, FaEnvelope, FaUniversity, FaEdit, FaPlus, FaCertificate } from "react-icons/fa";
 import MessageButton from "./components/MessageButton";
+import FollowButton from "./components/FollowButton";
 
 const API_URL = "http://localhost:8080/api";
 const POSTS_URL = `${API_URL}/posts`;
@@ -151,7 +152,7 @@ const ProfilePage = ({ currentUser }) => {
             )) : <span className="text-gray-400">No interests</span>}
           </div>
         </div>
-        {/* Edit buttons / Message button */}
+        {/* Edit buttons / Message button / Follow button */}
         <div className="mt-6 flex gap-3 justify-end">
           {userId === currentUser?.id ? (
             <>
@@ -159,12 +160,19 @@ const ProfilePage = ({ currentUser }) => {
               <button className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 text-white font-semibold shadow hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-400 transition" onClick={() => setSkillsEditMode(true)}><FaEdit /> Edit Skills/Interests</button>
             </>
           ) : (
-            <MessageButton 
-              targetUserId={user.id || userId}
-              targetUserName={user.name}
-              targetUserPhotoUrl={user.photoUrl}
-              className="inline-flex items-center gap-2 px-6 py-2 rounded-lg font-semibold shadow focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-            />
+            <>
+              <FollowButton
+                currentUserId={currentUser?.id}
+                targetUserId={user.id || userId}
+                className="inline-flex items-center gap-2 px-6 py-2 rounded-lg font-semibold shadow focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+              />
+              <MessageButton 
+                targetUserId={user.id || userId}
+                targetUserName={user.name}
+                targetUserPhotoUrl={user.photoUrl}
+                className="inline-flex items-center gap-2 px-6 py-2 rounded-lg font-semibold shadow focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+              />
+            </>
           )}
         </div>
       </div>
