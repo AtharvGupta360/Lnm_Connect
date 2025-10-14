@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle, Loader2, Users, X, Eye, MessageCircle, Home, UserCircle, Mail, LogOut, Sparkles, UserCheck, Bell } from "lucide-react";
+import { CheckCircle, Loader2, Users, X, Eye, MessageCircle, Home, UserCircle, Mail, LogOut, Sparkles, UserCheck, Bell, MessageSquare } from "lucide-react";
 import SignupDetails from "./SignupDetails";
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import ProfilePage from "./ProfilePage";
@@ -8,6 +8,9 @@ import ChatPage from "./pages/ChatPage";
 import SearchResultsPage from "./pages/SearchResultsPage";
 import MyNetworkPage from "./pages/MyNetworkPage";
 import ConnectionRequestsPage from "./pages/ConnectionRequestsPage";
+import SpacesPage from "./pages/SpacesPage";
+import SpaceDetailPage from "./pages/SpaceDetailPage";
+import ThreadDetailPage from "./pages/ThreadDetailPage";
 import SearchBar from "./components/SearchBar";
 import { followService } from "./services/followService";
 
@@ -55,6 +58,7 @@ const HeaderNav = ({ username, handleLogout }) => {
   const navLinks = [
     { path: '/', label: 'Home', icon: Home },
     { path: '/network', label: 'My Network', icon: UserCheck, badge: pendingRequestsCount },
+    { path: '/spaces', label: 'Discussions', icon: MessageSquare },
     { path: '/profile', label: 'My Profile', icon: UserCircle },
     { path: '/chat', label: 'Messages', icon: MessageCircle }
   ];
@@ -998,6 +1002,9 @@ const App = () => {
           <Route path="/search" element={<SearchResultsPage />} />
           <Route path="/network" element={<MyNetworkPage />} />
           <Route path="/network/requests" element={<ConnectionRequestsPage />} />
+          <Route path="/spaces" element={<SpacesPage />} />
+          <Route path="/spaces/:spaceId" element={<SpaceDetailPage />} />
+          <Route path="/threads/:threadId" element={<ThreadDetailPage />} />
           <Route path="/profile" element={<ProfilePage currentUser={getCurrentUser()} />} />
           <Route path="/profile/:userId" element={<ProfilePage currentUser={getCurrentUser()} />} />
           <Route path="/chat" element={<ChatPage />} />
