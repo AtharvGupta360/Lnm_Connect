@@ -1,16 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Loader2, User, FileText, Briefcase } from 'lucide-react';
+import { Search, X, Loader2, User, FileText, Briefcase, Hash, TrendingUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useDebounce } from '../hooks/useDebounce';
+import { api } from '../services/api';
 
 const SearchBar = ({ isCompact = false }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const searchRef = useRef(null);
+  const inputRef = useRef(null);
   const navigate = useNavigate();
+  
+  // Debounce the search query
+  const debouncedQuery = useDebounce(query, 300);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -24,34 +30,61 @@ const SearchBar = ({ isCompact = false }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Debounced search
+  // Debounced search with API
   useEffect(() => {
-    if (query.trim().length < 2) {
+    if (debouncedQuery.trim().length < 2) {
       setResults(null);
       setIsOpen(false);
       return;
     }
 
     setIsLoading(true);
-    const timeoutId = setTimeout(async () => {
-      try {
-        const response = await fetch(
-          `http://localhost:8080/api/search/quick?q=${encodeURIComponent(query)}`
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setResults(data);
-          setIsOpen(true);
-        }
-      } catch (error) {
+    
+    api.searchAutocomplete(debouncedQuery)
+      .then(response => {
+        setResults(response.data);
+        setIsOpen(true);
+        setSelectedIndex(-1);
+      })
+      .catch(error => {
         console.error('Search error:', error);
-      } finally {
+        setResults(null);
+      })
+      .finally(() => {
         setIsLoading(false);
-      }
-    }, 350); // 350ms debounce
+      });
+  }, [debouncedQuery]);
 
-    return () => clearTimeout(timeoutId);
-  }, [query]);
+  // Keyboard navigation
+  const handleKeyDown = (e) => {
+    if (!isOpen || !results) return;
+
+    const allResults = [
+      ...(results.profiles || []),
+      ...(results.posts || []),
+      ...(results.projects || [])
+    ];
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(prev => 
+        prev < allResults.length - 1 ? prev + 1 : prev
+      );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(prev => prev > 0 ? prev - 1 : -1);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (selectedIndex >= 0 && allResults[selectedIndex]) {
+        handleResultClick(allResults[selectedIndex]);
+      } else {
+        handleSearch(e);
+      }
+    } else if (e.key === 'Escape') {
+      setIsOpen(false);
+      inputRef.current?.blur();
+    }
+  };
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -117,56 +150,80 @@ const SearchBar = ({ isCompact = false }) => {
     ];
 
     return (
-      <div className="max-h-96 overflow-y-auto">
+      <>
         {categories.map(({ key, data, icon }) => {
           if (!data || data.length === 0) return null;
 
           return (
             <div key={key} className="border-b border-gray-100 last:border-0">
-              <div className="px-4 py-2 bg-gray-50 sticky top-0 z-10">
-                <div className="flex items-center space-x-2 text-sm font-semibold text-gray-700">
+              {/* Category Header */}
+              <div className="px-4 py-2.5 bg-gray-50/80 backdrop-blur-sm sticky top-0 z-10">
+                <div className="flex items-center space-x-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                   {getCategoryIcon(icon)}
                   <span>{getCategoryLabel(icon)}</span>
                 </div>
               </div>
-              {data.map((result) => (
+              
+              {/* Results List */}
+              {data.map((result, idx) => (
                 <motion.div
                   key={result.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="px-4 py-3 hover:bg-indigo-50 cursor-pointer transition-colors border-b border-gray-50 last:border-0"
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.03 }}
+                  className="px-4 py-3.5 hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors group"
                   onClick={() => handleResultClick(result)}
                 >
                   <div className="flex items-start space-x-3">
+                    {/* Avatar/Image */}
                     {result.imageUrl && (
-                      <img
-                        src={result.imageUrl}
-                        alt={result.title}
-                        className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                      />
+                      <div className="flex-shrink-0">
+                        <img
+                          src={result.imageUrl}
+                          alt={result.title}
+                          className="w-12 h-12 rounded-full object-cover ring-2 ring-gray-100 group-hover:ring-indigo-100 transition-all"
+                        />
+                      </div>
                     )}
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-gray-900 truncate">
+                    
+                    {/* Content */}
+                    <div className="flex-1 min-w-0 space-y-1">
+                      {/* Title */}
+                      <div className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
                         {result.title}
                       </div>
-                      <div className="text-sm text-gray-600 truncate">
-                        {result.subtitle}
-                      </div>
+                      
+                      {/* Subtitle */}
+                      {result.subtitle && (
+                        <div className="text-sm text-gray-600 line-clamp-1">
+                          {result.subtitle}
+                        </div>
+                      )}
+                      
+                      {/* Snippet */}
                       {result.snippet && (
-                        <div className="text-xs text-gray-500 mt-1 line-clamp-1">
+                        <div className="text-xs text-gray-500 line-clamp-2 leading-relaxed">
                           {result.snippet}
                         </div>
                       )}
+                      
+                      {/* Tags */}
                       {result.tags && result.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {result.tags.slice(0, 3).map((tag, idx) => (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {result.tags.slice(0, 3).map((tag, tagIdx) => (
                             <span
-                              key={idx}
-                              className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full"
+                              key={tagIdx}
+                              className="inline-flex items-center text-xs px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md font-medium"
                             >
+                              <Hash className="w-3 h-3 mr-0.5" />
                               {tag}
                             </span>
                           ))}
+                          {result.tags.length > 3 && (
+                            <span className="text-xs text-gray-400 px-1 py-0.5">
+                              +{result.tags.length - 3} more
+                            </span>
+                          )}
                         </div>
                       )}
                     </div>
@@ -176,34 +233,54 @@ const SearchBar = ({ isCompact = false }) => {
             </div>
           );
         })}
-        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
+        
+        {/* View All Footer */}
+        <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-indigo-50/30 border-t border-gray-100 sticky bottom-0">
           <button
             onClick={handleSearch}
-            className="w-full text-center text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+            className="w-full text-center text-sm font-semibold text-indigo-600 hover:text-indigo-700 hover:underline transition-all flex items-center justify-center space-x-2 py-1"
           >
-            View all results for "{query}" →
+            <span>View all results for "{query}"</span>
+            <TrendingUp className="w-4 h-4" />
           </button>
         </div>
-      </div>
+      </>
     );
   };
 
   return (
-    <div ref={searchRef} className={`relative ${isCompact ? 'w-full' : 'w-full max-w-2xl'}`}>
+    <div ref={searchRef} className="relative w-full">
       <form onSubmit={handleSearch} className="relative">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <div className="relative group">
+          {/* Search Icon */}
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-indigo-500 transition-colors pointer-events-none z-10" />
+          
+          {/* Input Field */}
           <input
+            ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => query.length >= 2 && results && setIsOpen(true)}
-            placeholder="Search people, posts, and opportunities..."
-            className="w-full pl-10 pr-10 py-2.5 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all outline-none text-sm"
+            onKeyDown={handleKeyDown}
+            placeholder="Search skills, people, projects..."
+            className="w-full pl-12 pr-24 py-3.5 text-[15px] border-2 border-gray-200 rounded-xl 
+                     bg-gray-50/50 backdrop-blur-sm
+                     focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-50 
+                     hover:border-gray-300 hover:bg-white
+                     transition-all duration-200 outline-none 
+                     placeholder:text-gray-400 text-gray-900
+                     shadow-sm hover:shadow"
+            aria-label="Search"
+            aria-autocomplete="list"
+            aria-controls="search-results"
+            aria-expanded={isOpen}
           />
-          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
+          
+          {/* Right Icons */}
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
             {isLoading && (
-              <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />
+              <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
             )}
             {query && !isLoading && (
               <button
@@ -212,10 +289,12 @@ const SearchBar = ({ isCompact = false }) => {
                   setQuery('');
                   setResults(null);
                   setIsOpen(false);
+                  inputRef.current?.focus();
                 }}
-                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-1.5 hover:bg-gray-200 rounded-full transition-colors"
+                aria-label="Clear search"
               >
-                <X className="w-4 h-4 text-gray-400" />
+                <X className="w-4 h-4 text-gray-500" />
               </button>
             )}
           </div>
@@ -226,11 +305,24 @@ const SearchBar = ({ isCompact = false }) => {
       <AnimatePresence>
         {isOpen && results && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="absolute top-full mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50"
+            initial={{ opacity: 0, y: -10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.98 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            id="search-results"
+            role="listbox"
+            className="absolute top-full left-0 right-0 mt-2 
+                     bg-white rounded-xl 
+                     shadow-2xl shadow-indigo-100/50
+                     border border-gray-200/80
+                     overflow-hidden
+                     z-[9999]
+                     max-h-[400px] overflow-y-auto
+                     scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent
+                     hover:scrollbar-thumb-gray-400"
+            style={{
+              backdropFilter: 'blur(10px)',
+            }}
           >
             {renderResults()}
           </motion.div>
