@@ -26,6 +26,7 @@ const CreatePostCard = ({ username, onPostCreated }) => {
   const [postTags, setPostTags] = useState([]);
   const [postImage, setPostImage] = useState('');
   const [postApplyEnabled, setPostApplyEnabled] = useState(false);
+  const [applicationDeadline, setApplicationDeadline] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -44,6 +45,13 @@ const CreatePostCard = ({ username, onPostCreated }) => {
     setIsSubmitting(true);
     try {
       const user = getCurrentUser();
+      
+      // Convert deadline to timestamp if provided
+      let deadlineTimestamp = null;
+      if (postApplyEnabled && applicationDeadline) {
+        deadlineTimestamp = new Date(applicationDeadline).getTime();
+      }
+      
       await api.createPost({
         title: postTitle,
         tags: postTags,
@@ -53,7 +61,8 @@ const CreatePostCard = ({ username, onPostCreated }) => {
         authorName: user?.name,
         taggedUserIds: [],
         taggedClubIds: [],
-        isApplyEnabled: postApplyEnabled
+        isApplyEnabled: postApplyEnabled,
+        applicationDeadline: deadlineTimestamp
       });
 
       setSuccess('Post created successfully! 🎉');
@@ -66,6 +75,7 @@ const CreatePostCard = ({ username, onPostCreated }) => {
         setPostTags([]);
         setPostImage('');
         setPostApplyEnabled(false);
+        setApplicationDeadline('');
         setShowModal(false);
         setSuccess('');
         if (onPostCreated) onPostCreated();
@@ -284,6 +294,25 @@ const CreatePostCard = ({ username, onPostCreated }) => {
                       <p className="text-xs text-gray-500">Allow others to apply for this opportunity</p>
                     </div>
                   </label>
+                  
+                  {/* Application Deadline - Show only when apply is enabled */}
+                  {postApplyEnabled && (
+                    <div className="mt-3 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                      <label className="block text-sm font-medium text-gray-900 mb-2">
+                        Application Deadline (Optional)
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={applicationDeadline}
+                        onChange={(e) => setApplicationDeadline(e.target.value)}
+                        min={new Date().toISOString().slice(0, 16)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                      />
+                      <p className="text-xs text-gray-600 mt-1">
+                        Set a deadline after which applications won't be accepted
+                      </p>
+                    </div>
+                  )}
                 </div>
               </form>
 

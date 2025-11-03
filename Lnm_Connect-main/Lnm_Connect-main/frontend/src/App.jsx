@@ -881,19 +881,63 @@ export default App;
 function PostCard({ post, currentUserId, onApplied }) {
   const [showApplicants, setShowApplicants] = useState(false);
   const isOwner = post.authorId === currentUserId;
+  
+  // Check if deadline has passed
+  const deadlinePassed = post.applicationDeadline && Date.now() > post.applicationDeadline;
+  
   return (
     <div className="relative">
       {/* Main post content (title, tags, body, etc.) is already rendered above */}
-      {/* Apply Button or Applied State */}
-      {post.isApplyEnabled && !isOwner && (
-        <ApplyButton
-          postId={post.id}
-          userId={currentUserId}
-          hasApplied={post.hasApplied}
-          onApplied={onApplied}
-          applicantCount={Array.isArray(post.applicants) ? post.applicants.length : 0}
-        />
+      
+      {/* Deadline Info - Show for all when deadline exists */}
+      {post.isApplyEnabled && post.applicationDeadline && (
+        <div className={`mt-2 px-3 py-2 rounded-lg text-sm font-medium ${
+          deadlinePassed 
+            ? 'bg-red-50 text-red-700 border border-red-200' 
+            : 'bg-yellow-50 text-yellow-800 border border-yellow-200'
+        }`}>
+          <span className="font-semibold">
+            {deadlinePassed ? '⏰ Application Deadline Expired' : '⏰ Application Deadline:'}
+          </span>{' '}
+          {new Date(post.applicationDeadline).toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          })}
+        </div>
       )}
+      
+      {/* Apply Button or Applied State or Deadline Expired */}
+      {post.isApplyEnabled && !isOwner && (
+        <>
+          {post.hasApplied ? (
+            <button
+              className="mt-2 flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-500 font-semibold border border-gray-200 cursor-not-allowed"
+              disabled
+            >
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              Applied <span className="ml-1">✅</span>
+            </button>
+          ) : deadlinePassed ? (
+            <div className="mt-2 flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-50 text-red-700 font-semibold border border-red-300">
+              <X className="w-5 h-5" />
+              Deadline Reached - Applications Closed
+            </div>
+          ) : (
+            <ApplyButton
+              postId={post.id}
+              userId={currentUserId}
+              hasApplied={post.hasApplied}
+              onApplied={onApplied}
+              applicantCount={Array.isArray(post.applicants) ? post.applicants.length : 0}
+            />
+          )}
+        </>
+      )}
+      
       {/* Owner: View Applicants Button */}
       {isOwner && post.isApplyEnabled && (
         <button
@@ -932,13 +976,21 @@ function ApplyButton({ postId, userId, hasApplied, onApplied, applicantCount }) 
     setLoading(true);
     try {
       const res = await fetch(`http://localhost:8080/api/posts/${postId}/apply?userId=${userId}`, { method: 'POST' });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const errorText = await res.text();
+        // Check if it's a deadline error
+        if (errorText.includes("deadline has passed") || errorText.includes("Application deadline")) {
+          throw new Error("⏰ Sorry, the application deadline for this opportunity has passed. You can no longer apply.");
+        }
+        throw new Error(errorText || "Failed to apply");
+      }
       setApplied(true);
       if (onApplied) onApplied();
       toast("Application submitted successfully!", "success");
     } catch (e) {
-      setError(e.message || "Could not apply");
-      toast(e.message || "Could not apply", "error");
+      const errorMsg = e.message || "Could not apply";
+      setError(errorMsg);
+      toast(errorMsg, "error");
     }
     setLoading(false);
     setShowConfirm(false);

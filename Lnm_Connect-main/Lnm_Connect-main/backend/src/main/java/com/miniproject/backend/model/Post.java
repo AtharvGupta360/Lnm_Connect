@@ -10,6 +10,7 @@ public class Post {
     @JsonProperty("isApplyEnabled")
     private boolean isApplyEnabled = false;
     private java.util.List<String> applicationIds = new java.util.ArrayList<>();
+    private Long applicationDeadline; // Unix timestamp in milliseconds
     @Id
     private String id;
     private String title;
@@ -36,6 +37,8 @@ public class Post {
     public void setApplyEnabled(boolean applyEnabled) { isApplyEnabled = applyEnabled; }
     public java.util.List<String> getApplicationIds() { return applicationIds == null ? new java.util.ArrayList<>() : applicationIds; }
     public void setApplicationIds(java.util.List<String> applicationIds) { this.applicationIds = applicationIds; }
+    public Long getApplicationDeadline() { return applicationDeadline; }
+    public void setApplicationDeadline(Long applicationDeadline) { this.applicationDeadline = applicationDeadline; }
 
     public Post() {
         this.createdAt = System.currentTimeMillis();

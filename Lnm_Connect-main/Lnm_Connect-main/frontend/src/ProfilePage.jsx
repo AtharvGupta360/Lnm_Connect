@@ -24,6 +24,7 @@ const ProfilePage = ({ currentUser }) => {
   const [skillsEditMode, setSkillsEditMode] = useState(false);
   const [skillsInput, setSkillsInput] = useState("");
   const [interestsInput, setInterestsInput] = useState("");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   // Predefined skills/interests (extend as needed)
   const [allSkills] = useState(["Java", "C++", "Python", "Machine Learning", "Web Development", "React", "Node.js", "Data Science", "Cloud", "AWS", "Spring Boot", "MongoDB"]);
   const [allInterests] = useState(["AI", "Robotics", "Open Source", "Startups", "Design", "UI/UX", "Blockchain", "Cybersecurity", "Competitive Programming", "App Development", "Research", "Entrepreneurship"]);
@@ -102,11 +103,80 @@ const ProfilePage = ({ currentUser }) => {
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-xl mx-auto">
         {/* Avatar, Name, Email */}
         <div className="flex flex-col items-center gap-3">
-          {user.photoUrl ? (
-            <img src={user.photoUrl} alt="Profile" className="w-24 h-24 rounded-full object-cover border-4 border-slate-100 shadow" />
-          ) : (
-            <FaUserCircle className="w-24 h-24 text-slate-300" />
-          )}
+          <div className="relative">
+            {user.photoUrl ? (
+              <img src={user.photoUrl} alt="Profile" className="w-24 h-24 rounded-full object-cover border-4 border-slate-100 shadow" />
+            ) : (
+              <FaUserCircle className="w-24 h-24 text-slate-300" />
+            )}
+            {/* Upload Photo Button (only for own profile) */}
+            {userId === currentUser?.id && (
+              <label 
+                htmlFor="photo-upload" 
+                className="absolute bottom-0 right-0 bg-indigo-600 text-white p-2 rounded-full cursor-pointer hover:bg-indigo-700 transition shadow-lg"
+                title="Upload profile picture"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <input
+                  id="photo-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploadingPhoto}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    // Validate file size (5MB max)
+                    if (file.size > 5 * 1024 * 1024) {
+                      alert('File size must be less than 5MB');
+                      return;
+                    }
+
+                    // Validate file type
+                    if (!file.type.startsWith('image/')) {
+                      alert('Please select an image file');
+                      return;
+                    }
+
+                    setUploadingPhoto(true);
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('userId', userId);
+
+                    try {
+                      const res = await fetch(`${API_URL}/upload/profile-picture`, {
+                        method: 'POST',
+                        body: formData
+                      });
+                      const data = await res.json();
+                      
+                      if (res.ok) {
+                        // Update user state with new photo URL
+                        setUser({ ...user, photoUrl: data.photoUrl });
+                        alert('✅ Profile picture uploaded successfully!');
+                      } else {
+                        alert('❌ ' + (data.error || 'Failed to upload photo'));
+                      }
+                    } catch (error) {
+                      alert('❌ Failed to upload photo');
+                    } finally {
+                      setUploadingPhoto(false);
+                      e.target.value = ''; // Reset input
+                    }
+                  }}
+                />
+              </label>
+            )}
+            {uploadingPhoto && (
+              <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+              </div>
+            )}
+          </div>
           <h2 className="text-2xl font-bold text-slate-900">{user.name}</h2>
           <div className="flex items-center gap-2 text-slate-500 text-sm">
             <FaEnvelope className="inline-block mr-1" />

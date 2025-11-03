@@ -30,6 +30,13 @@ public class ApplicationService {
         if (userId == null || userId.isEmpty()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
         Post post = postRepository.findById(postId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
         if (!post.isApplyEnabled()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Applications not enabled for this post");
+        
+        // Check if application deadline has passed
+        if (post.getApplicationDeadline() != null && System.currentTimeMillis() > post.getApplicationDeadline()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, 
+                "⏰ The application deadline for this opportunity has passed. Applications are no longer being accepted.");
+        }
+        
         if (applicationRepository.existsByUserIdAndPostId(userId, postId))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Already applied to this post");
 
@@ -75,7 +82,16 @@ public class ApplicationService {
         List<ApplicantDTO> applicants = null;
         if (post.isApplyEnabled()) {
             hasApplied = (currentUserId != null && !currentUserId.isEmpty()) && hasUserApplied(currentUserId, post.getId());
-            canApply = (currentUserId != null && !currentUserId.isEmpty()) && !hasApplied && !post.getAuthorId().equals(currentUserId);
+            
+            // Check if deadline has passed
+            boolean deadlinePassed = post.getApplicationDeadline() != null && 
+                                    System.currentTimeMillis() > post.getApplicationDeadline();
+            
+            canApply = (currentUserId != null && !currentUserId.isEmpty()) && 
+                      !hasApplied && 
+                      !post.getAuthorId().equals(currentUserId) &&
+                      !deadlinePassed;
+            
             if (post.getAuthorId().equals(currentUserId)) {
                 applicants = getApplicantsForPost(post.getId(), currentUserId);
             }

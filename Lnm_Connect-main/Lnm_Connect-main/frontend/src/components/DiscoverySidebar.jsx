@@ -21,6 +21,8 @@ const DiscoverySidebar = ({ username }) => {
     events: []
   });
   const [trendingTopics, setTrendingTopics] = useState([]);
+  const [popularProjects, setPopularProjects] = useState([]);
+  const [campusBuzz, setCampusBuzz] = useState([]);
   const [loading, setLoading] = useState(true);
   const [connectingIds, setConnectingIds] = useState(new Set());
   const toast = useToast();
@@ -29,8 +31,30 @@ const DiscoverySidebar = ({ username }) => {
     const fetchDiscoveryData = async () => {
       try {
         const userId = getCurrentUserId();
+        
+        // Fetch popular projects from posts
+        const projectsRes = await fetch('http://localhost:8080/api/posts/popular-projects?limit=5');
+        if (projectsRes.ok) {
+          const projects = await projectsRes.json();
+          setPopularProjects(projects);
+        }
+        
+        // Fetch campus buzz
+        const buzzRes = await fetch('http://localhost:8080/api/campus-buzz/upcoming');
+        if (buzzRes.ok) {
+          const buzz = await buzzRes.json();
+          setCampusBuzz(buzz.slice(0, 5));
+        }
+        
+        // Fetch trending topics
+        const topicsRes = await fetch('http://localhost:8080/api/posts/trending-topics');
+        if (topicsRes.ok) {
+          const topics = await topicsRes.json();
+          setTrendingTopics(topics);
+        }
+        
         if (userId) {
-          // Fetch all recommendations in parallel
+          // Fetch profile recommendations
           const [profilesRes, projectsRes, eventsRes] = await Promise.all([
             api.getProfileRecommendations(userId, 3),
             api.getProjectRecommendations(userId, 3),
@@ -50,15 +74,6 @@ const DiscoverySidebar = ({ username }) => {
         setLoading(false);
       }
     };
-
-    // Set trending topics
-    setTrendingTopics([
-      { name: 'AI & Machine Learning', posts: 45 },
-      { name: 'Web Development', posts: 38 },
-      { name: 'Hackathons', posts: 32 },
-      { name: 'Open Source', posts: 28 },
-      { name: 'Campus Events', posts: 25 }
-    ]);
 
     fetchDiscoveryData();
   }, []);
@@ -185,25 +200,26 @@ const DiscoverySidebar = ({ username }) => {
                 </div>
               ))}
             </div>
-          ) : recommendations.projects.length > 0 ? (
+          ) : popularProjects.length > 0 ? (
             <div className="space-y-3">
-              {recommendations.projects.map((project, idx) => (
+              {popularProjects.map((project, idx) => (
                 <div
-                  key={idx}
+                  key={project.id || idx}
                   className="group hover:bg-gray-50 p-2 rounded-lg transition-colors cursor-pointer"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900 text-sm group-hover:text-purple-600 line-clamp-1">
+                      <p className="font-medium text-gray-900 text-sm group-hover:text-purple-600 line-clamp-2">
                         {project.title}
                       </p>
                       <div className="flex items-center space-x-2 mt-1">
-                        <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full font-medium">
-                          {project.matchPercentage}% match
+                        <span className="flex items-center text-xs text-gray-500">
+                          <Star className="w-3 h-3 text-yellow-500 mr-1 fill-current" />
+                          {project.likes?.size || 0} likes
                         </span>
-                        {project.spotsAvailable && (
-                          <span className="text-xs text-gray-500">
-                            {project.spotsAvailable} spots
+                        {project.tags && project.tags.length > 0 && (
+                          <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full font-medium">
+                            {project.tags[0]}
                           </span>
                         )}
                       </div>
@@ -227,7 +243,7 @@ const DiscoverySidebar = ({ username }) => {
               <Calendar className="w-4 h-4 text-orange-600" />
               <h3 className="font-semibold text-gray-900 text-sm">Campus Buzz</h3>
             </div>
-            <Link to="/recommendations" className="text-xs text-orange-600 hover:text-orange-700 font-medium">
+            <Link to="/campus-buzz" className="text-xs text-orange-600 hover:text-orange-700 font-medium">
               View all
             </Link>
           </div>
@@ -243,27 +259,40 @@ const DiscoverySidebar = ({ username }) => {
                 </div>
               ))}
             </div>
-          ) : recommendations.events.length > 0 ? (
+          ) : campusBuzz.length > 0 ? (
             <div className="space-y-3">
-              {recommendations.events.map((event, idx) => (
-                <div
-                  key={idx}
-                  className="group hover:bg-gray-50 p-2 rounded-lg transition-colors cursor-pointer"
-                >
-                  <p className="font-medium text-gray-900 text-sm group-hover:text-orange-600 line-clamp-1">
-                    {event.title}
-                  </p>
-                  <div className="flex items-center justify-between mt-1">
-                    <div className="flex items-center space-x-1 text-xs text-gray-500">
-                      <Clock className="w-3 h-3" />
-                      <span>{event.daysUntilEvent} days</span>
+              {campusBuzz.map((buzz, idx) => {
+                const daysUntil = Math.ceil((buzz.eventDate - Date.now()) / (1000 * 60 * 60 * 24));
+                const categoryColors = {
+                  'PLACEMENT': 'bg-blue-50 text-blue-700',
+                  'CULTURAL': 'bg-pink-50 text-pink-700',
+                  'TECHNICAL': 'bg-purple-50 text-purple-700',
+                  'SPORTS': 'bg-green-50 text-green-700',
+                  'ANNOUNCEMENT': 'bg-red-50 text-red-700',
+                  'WORKSHOP': 'bg-indigo-50 text-indigo-700',
+                  'FEST': 'bg-yellow-50 text-yellow-700'
+                };
+                
+                return (
+                  <div
+                    key={buzz.id || idx}
+                    className="group hover:bg-gray-50 p-2 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <p className="font-medium text-gray-900 text-sm group-hover:text-orange-600 line-clamp-2">
+                      {buzz.title}
+                    </p>
+                    <div className="flex items-center justify-between mt-1">
+                      <div className="flex items-center space-x-1 text-xs text-gray-500">
+                        <Clock className="w-3 h-3" />
+                        <span>{daysUntil > 0 ? `${daysUntil} days` : 'Today'}</span>
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${categoryColors[buzz.category] || 'bg-gray-50 text-gray-700'}`}>
+                        {buzz.category}
+                      </span>
                     </div>
-                    <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full font-medium">
-                      {event.matchPercentage}% match
-                    </span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm text-gray-500 text-center py-4">No events scheduled</p>
@@ -281,22 +310,36 @@ const DiscoverySidebar = ({ username }) => {
         </div>
         
         <div className="p-4">
-          <div className="space-y-2">
-            {trendingTopics.map((topic, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between hover:bg-gray-50 p-2 rounded-lg transition-colors cursor-pointer group"
-              >
-                <div className="flex items-center space-x-2">
-                  <span className="text-gray-400 text-xs font-medium">#{idx + 1}</span>
-                  <span className="text-sm text-gray-700 group-hover:text-indigo-600 font-medium">
-                    {topic.name}
+          {loading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="animate-pulse">
+                  <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                </div>
+              ))}
+            </div>
+          ) : trendingTopics.length > 0 ? (
+            <div className="space-y-2">
+              {trendingTopics.map((topic, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between hover:bg-gray-50 p-2 rounded-lg transition-colors cursor-pointer group"
+                >
+                  <div className="flex items-center space-x-2">
+                    <span className="text-gray-400 text-xs font-medium">#{idx + 1}</span>
+                    <span className="text-sm font-medium text-gray-700 group-hover:text-indigo-600">
+                      {topic.name}
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                    {topic.count} posts
                   </span>
                 </div>
-                <span className="text-xs text-gray-500">{topic.posts} posts</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 text-center py-4">No trending topics</p>
+          )}
         </div>
       </div>
 
