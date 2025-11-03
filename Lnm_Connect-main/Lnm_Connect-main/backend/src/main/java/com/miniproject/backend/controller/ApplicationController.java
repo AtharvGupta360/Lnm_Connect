@@ -32,4 +32,26 @@ public class ApplicationController {
     public List<ApplicantDTO> getApplicants(@PathVariable String postId, @RequestParam String ownerId) {
         return applicationService.getApplicantsForPost(postId, ownerId);
     }
+
+    // PUT /posts/applications/{applicationId}/accept
+    @PutMapping("/applications/{applicationId}/accept")
+    public Map<String, Object> acceptApplication(@PathVariable String applicationId, @RequestParam String ownerId) {
+        Application app = applicationService.acceptApplication(applicationId, ownerId);
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", true);
+        resp.put("message", "Application accepted");
+        resp.put("status", app.getStatus().toString());
+        return resp;
+    }
+
+    // PUT /posts/applications/{applicationId}/reject
+    @PutMapping("/applications/{applicationId}/reject")
+    public Map<String, Object> rejectApplication(@PathVariable String applicationId, @RequestParam String ownerId) {
+        Application app = applicationService.rejectApplication(applicationId, ownerId);
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", true);
+        resp.put("message", "Application rejected");
+        resp.put("status", app.getStatus().toString());
+        return resp;
+    }
 }

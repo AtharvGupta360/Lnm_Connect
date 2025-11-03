@@ -1012,6 +1012,74 @@ function ApplyButton({ postId, userId, hasApplied, onApplied, applicantCount }) 
 
 // --- APPLICANTS MODAL COMPONENT ---
 function ApplicantsModal({ applicants, onClose }) {
+  const currentUserId = localStorage.getItem("userId");
+  const [applicantsList, setApplicantsList] = useState(applicants);
+  const [loadingAction, setLoadingAction] = useState({});
+
+  useEffect(() => {
+    setApplicantsList(applicants);
+  }, [applicants]);
+
+  const handleAccept = async (applicationId, applicantName) => {
+    if (!window.confirm(`Accept application from ${applicantName}?`)) return;
+    
+    setLoadingAction(prev => ({ ...prev, [applicationId]: 'accepting' }));
+    try {
+      const res = await fetch(`http://localhost:8080/api/posts/applications/${applicationId}/accept?ownerId=${currentUserId}`, { 
+        method: 'PUT' 
+      });
+      if (!res.ok) throw new Error(await res.text());
+      
+      // Update local state
+      setApplicantsList(prev => prev.map(app => 
+        app.applicationId === applicationId 
+          ? { ...app, status: 'ACCEPTED' } 
+          : app
+      ));
+      
+      toast(`Application from ${applicantName} accepted!`, "success");
+    } catch (e) {
+      toast(e.message || "Could not accept application", "error");
+    }
+    setLoadingAction(prev => ({ ...prev, [applicationId]: null }));
+  };
+
+  const handleReject = async (applicationId, applicantName) => {
+    if (!window.confirm(`Reject application from ${applicantName}?`)) return;
+    
+    setLoadingAction(prev => ({ ...prev, [applicationId]: 'rejecting' }));
+    try {
+      const res = await fetch(`http://localhost:8080/api/posts/applications/${applicationId}/reject?ownerId=${currentUserId}`, { 
+        method: 'PUT' 
+      });
+      if (!res.ok) throw new Error(await res.text());
+      
+      // Update local state
+      setApplicantsList(prev => prev.map(app => 
+        app.applicationId === applicationId 
+          ? { ...app, status: 'REJECTED' } 
+          : app
+      ));
+      
+      toast(`Application from ${applicantName} rejected`, "success");
+    } catch (e) {
+      toast(e.message || "Could not reject application", "error");
+    }
+    setLoadingAction(prev => ({ ...prev, [applicationId]: null }));
+  };
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'ACCEPTED':
+        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800">✓ Accepted</span>;
+      case 'REJECTED':
+        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800">✗ Rejected</span>;
+      case 'PENDING':
+      default:
+        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-800">⏳ Pending</span>;
+    }
+  };
+
   return (
     <motion.div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40"
@@ -1020,7 +1088,7 @@ function ApplicantsModal({ applicants, onClose }) {
       exit={{ opacity: 0 }}
     >
       <motion.div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 relative"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden p-8 relative flex flex-col"
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
@@ -1029,37 +1097,77 @@ function ApplicantsModal({ applicants, onClose }) {
           <X />
         </button>
         <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 text-blue-700">
-          <Users className="w-7 h-7" /> Applicants
+          <Users className="w-7 h-7" /> Applicants ({applicantsList.length})
         </h2>
-        {applicants.length === 0 ? (
-          <div className="text-gray-400 text-center">No applicants yet.</div>
-        ) : (
-          <ul className="space-y-3">
-            {applicants.map(u => (
-              <li key={u.id} className="flex items-center gap-4 bg-blue-50 rounded-lg p-3 hover:bg-blue-100 transition">
-                <div className="flex-shrink-0">
-                  <img
-                    src={`https://api.dicebear.com/7.x/identicon/svg?seed=${u.id}`}
-                    alt={u.name}
-                    className="w-10 h-10 rounded-full border border-blue-200"
-                  />
-                </div>
-                <div className="flex-1">
-                  <div className="font-semibold text-blue-900">{u.name}</div>
-                  <div className="text-xs text-blue-700">{u.email}</div>
-                  <div className="text-xs text-gray-500">Applied: {u.dateApplied ? new Date(u.dateApplied).toLocaleString() : "-"}</div>
-                </div>
-                <a
-                  href={`/profile/${u.id}`}
-                  className="px-3 py-1 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition"
-                  target="_blank" rel="noopener noreferrer"
-                >
-                  View Profile
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
+        
+        <div className="overflow-y-auto flex-1">
+          {applicantsList.length === 0 ? (
+            <div className="text-gray-400 text-center py-8">No applicants yet.</div>
+          ) : (
+            <ul className="space-y-3">
+              {applicantsList.map(u => (
+                <li key={u.id} className="flex items-start gap-4 bg-blue-50 rounded-lg p-4 hover:bg-blue-100 transition">
+                  <div className="flex-shrink-0">
+                    <img
+                      src={`https://api.dicebear.com/7.x/identicon/svg?seed=${u.id}`}
+                      alt={u.name}
+                      className="w-12 h-12 rounded-full border-2 border-blue-200"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="font-bold text-blue-900">{u.name}</div>
+                      {getStatusBadge(u.status)}
+                    </div>
+                    <div className="text-xs text-blue-700">{u.email}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Applied: {u.dateApplied ? new Date(u.dateApplied).toLocaleString() : "-"}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 flex-shrink-0">
+                    <a
+                      href={`/profile/${u.id}`}
+                      className="px-3 py-1 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition text-center"
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                    >
+                      View Profile
+                    </a>
+                    
+                    {u.status === 'PENDING' && (
+                      <>
+                        <button
+                          onClick={() => handleAccept(u.applicationId, u.name)}
+                          disabled={loadingAction[u.applicationId]}
+                          className="px-3 py-1 rounded bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                        >
+                          {loadingAction[u.applicationId] === 'accepting' ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <CheckCircle className="w-3 h-3" />
+                          )}
+                          Accept
+                        </button>
+                        <button
+                          onClick={() => handleReject(u.applicationId, u.name)}
+                          disabled={loadingAction[u.applicationId]}
+                          className="px-3 py-1 rounded bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                        >
+                          {loadingAction[u.applicationId] === 'rejecting' ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <X className="w-3 h-3" />
+                          )}
+                          Reject
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </motion.div>
     </motion.div>
   );

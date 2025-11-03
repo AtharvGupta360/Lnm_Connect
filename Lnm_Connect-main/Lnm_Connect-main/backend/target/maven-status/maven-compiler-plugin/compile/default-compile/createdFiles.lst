@@ -59,6 +59,7 @@ com\miniproject\backend\controller\ItemController.class
 com\miniproject\backend\dto\ApplicantDTO.class
 com\miniproject\backend\model\Message.class
 com\miniproject\backend\controller\AuthController.class
+com\miniproject\backend\model\Application$ApplicationStatus.class
 com\miniproject\backend\service\ApplicationService.class
 com\miniproject\backend\BackendApplication.class
 com\miniproject\backend\model\Application.class

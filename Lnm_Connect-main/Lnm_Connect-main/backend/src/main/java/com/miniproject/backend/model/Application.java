@@ -11,13 +11,25 @@ public class Application {
     private String userId;
     private String postId;
     private Date dateApplied;
+    private ApplicationStatus status;
 
-    public Application() {}
+    public enum ApplicationStatus {
+        PENDING,
+        ACCEPTED,
+        REJECTED
+    }
+
+    public Application() {
+        this.status = ApplicationStatus.PENDING;
+    }
+    
     public Application(String userId, String postId) {
         this.userId = userId;
         this.postId = postId;
         this.dateApplied = new Date();
+        this.status = ApplicationStatus.PENDING;
     }
+    
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
     public String getUserId() { return userId; }
@@ -26,4 +38,6 @@ public class Application {
     public void setPostId(String postId) { this.postId = postId; }
     public Date getDateApplied() { return dateApplied; }
     public void setDateApplied(Date dateApplied) { this.dateApplied = dateApplied; }
+    public ApplicationStatus getStatus() { return status; }
+    public void setStatus(ApplicationStatus status) { this.status = status; }
 }
