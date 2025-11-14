@@ -1,0 +1,8 @@
+# Gemini-Powered Chatbot Requirements
+# Minimal dependencies with Google Gemini
+
+fastapi==0.104.1
+uvicorn==0.24.0
+pydantic==2.10.5
+google-generativeai==0.3.2
+python-dotenv==1.0.0
