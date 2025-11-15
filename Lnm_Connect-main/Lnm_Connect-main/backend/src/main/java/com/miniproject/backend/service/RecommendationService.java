@@ -39,8 +39,13 @@ public class RecommendationService {
      */
     @Transactional
     public List<ProfileRecommendationDTO> generateProfileRecommendations(String userId) {
-        User currentUser = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+        Optional<User> currentUserOpt = userRepository.findById(userId);
+        if (!currentUserOpt.isPresent()) {
+            // Return empty list if user not found instead of throwing exception
+            return new ArrayList<>();
+        }
+        
+        User currentUser = currentUserOpt.get();
         
         // Get all other users
         List<User> allUsers = userRepository.findAll();
@@ -131,8 +136,13 @@ public class RecommendationService {
      */
     @Transactional
     public List<ProjectRecommendationDTO> generateProjectRecommendations(String userId) {
-        User currentUser = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+        Optional<User> currentUserOpt = userRepository.findById(userId);
+        if (!currentUserOpt.isPresent()) {
+            // Return empty list if user not found instead of throwing exception
+            return new ArrayList<>();
+        }
+        
+        User currentUser = currentUserOpt.get();
         
         // Get recruiting projects
         List<Project> projects = projectRepository.findRecruitingProjects();
@@ -218,8 +228,13 @@ public class RecommendationService {
      */
     @Transactional
     public List<EventRecommendationDTO> generateEventRecommendations(String userId) {
-        User currentUser = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+        Optional<User> currentUserOpt = userRepository.findById(userId);
+        if (!currentUserOpt.isPresent()) {
+            // Return empty list if user not found instead of throwing exception
+            return new ArrayList<>();
+        }
+        
+        User currentUser = currentUserOpt.get();
         
         // Get upcoming events
         List<Event> events = eventRepository.findUpcomingEvents(LocalDateTime.now());

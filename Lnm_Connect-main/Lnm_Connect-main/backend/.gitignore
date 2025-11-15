@@ -1,0 +1,107 @@
+<<<<<<< HEAD
+# Compiled class file
+*.class
+
+# Log file
+*.log
+
+# BlueJ files
+*.ctxt
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files #
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+replay_pid*
+=======
+# .gitignore for Java backend (Maven/Gradle, IDEs, OS files, logs, secrets)
+
+# Compiled classes and packages
+*.class
+*.jar
+*.war
+*.ear
+
+# Build directories
+/target/
+/build/
+/out/
+
+# Maven
+/pom.xml.tag
+/pom.xml.releaseBackup
+/pom.xml.versionsBackup
+.mvn/wrapper/maven-wrapper.jar
+
+# Gradle
+/.gradle/
+/gradle-app.setting
+gradle-wrapper.jar
+gradle-wrapper.properties
+
+# IDEs
+/.idea/
+/*.iml
+*.iws
+/.classpath
+/.project
+/.settings/
+/out/
+
+# VS Code
+.vscode/
+
+# Logs, temp files, runtime
+*.log
+logs/
+tmp/
+temp/
+*.pid
+*.seed
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Sensitive configs / local overrides
+.env
+.env.*
+application-local.properties
+application-local.yml
+secrets.properties
+credentials.properties
+*.jks
+*.keystore
+
+# Dependency caches (optional)
+/.m2/repository/
+/.gradle/
+
+# Test / coverage
+jacoco.exec
+coverage/
+
+# Generated sources
+/generated/
+/generated-sources/
+
+# Database files
+*.db
+*.sqlite
+*.sql
+
+# Keep gitignore itself
+!.gitignore
+>>>>>>> f2fd533 (first)

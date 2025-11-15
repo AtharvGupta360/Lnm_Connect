@@ -351,14 +351,14 @@ const ProfilePage = ({ currentUser }) => {
                   <>
                     {/* PDF view/download */}
                     {cert.fileUrl.endsWith('.pdf') ? (
-                      <a href={`http://localhost:8080/api/certificates/file/${cert.id}`} target="_blank" rel="noopener noreferrer" download className="inline-block bg-slate-200 text-slate-500 rounded-full px-3 py-2 text-xs font-semibold hover:bg-slate-300 transition">View PDF</a>
+                      <a href={`${API_URL}/certificates/file/${cert.id}`} target="_blank" rel="noopener noreferrer" download className="inline-block bg-slate-200 text-slate-500 rounded-full px-3 py-2 text-xs font-semibold hover:bg-slate-300 transition">View PDF</a>
                     ) : (
                       <>
                         {/* Image preview and download */}
-                        <a href={`http://localhost:8080/api/certificates/file/${cert.id}`} target="_blank" rel="noopener noreferrer">
-                          <img src={`http://localhost:8080/api/certificates/file/${cert.id}`} alt="Certificate" className="w-16 h-16 object-cover rounded-lg border" />
+                        <a href={`${API_URL}/certificates/file/${cert.id}`} target="_blank" rel="noopener noreferrer">
+                          <img src={`${API_URL}/certificates/file/${cert.id}`} alt="Certificate" className="w-16 h-16 object-cover rounded-lg border" />
                         </a>
-                        <a href={`http://localhost:8080/api/certificates/file/${cert.id}`} download className="block mt-1 text-xs text-blue-600 hover:underline">Download</a>
+                        <a href={`${API_URL}/certificates/file/${cert.id}`} download className="block mt-1 text-xs text-blue-600 hover:underline">Download</a>
                       </>
                     )}
                   </>

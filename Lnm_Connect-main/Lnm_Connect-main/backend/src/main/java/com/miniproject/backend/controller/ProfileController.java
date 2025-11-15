@@ -3,6 +3,7 @@ package com.miniproject.backend.controller;
 import com.miniproject.backend.model.User;
 import com.miniproject.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -16,6 +17,20 @@ public class ProfileController {
     @GetMapping("/me")
     public User getMyProfile(@RequestParam String userId) {
         return userRepository.findById(userId).orElse(null);
+    }
+
+    // Get any user's profile by ID
+    @GetMapping("/{userId}")
+    public ResponseEntity<?> getUserProfile(@PathVariable String userId) {
+        try {
+            User user = userRepository.findById(userId).orElse(null);
+            if (user == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(user);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error fetching profile: " + e.getMessage());
+        }
     }
 
     // Update profile info (name, bio, education, branchYear, contact, photoUrl, etc.)

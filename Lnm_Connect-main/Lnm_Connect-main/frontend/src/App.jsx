@@ -19,6 +19,8 @@ import CreatePostCard from "./components/CreatePostCard";
 import { PostSkeleton } from "./components/SkeletonLoaders";
 import { ToastProvider } from "./contexts/ToastContext";
 import { followService } from "./services/followService";
+import ChatBot from "./components/ChatBot";
+import AdminUnanswered from "./pages/AdminUnanswered";
 
 // Backend API URL
 const API_URL = "http://localhost:8080/api/posts";
@@ -246,6 +248,9 @@ const App = () => {
   // Refs for scrolling to specific posts
   const postRefs = useRef({});
   const [highlightedPost, setHighlightedPost] = useState(null);
+  
+  // ChatBot state
+  const [showChatBot, setShowChatBot] = useState(false);
 
   // Handle extended signup details after signup
   const handleSignupDetails = async (details) => {
@@ -413,7 +418,7 @@ const App = () => {
         }
       } catch {}
     }
-    
+
     // Fetch all clubs for tagging
     async function fetchAllClubs() {
       try {
@@ -868,7 +873,22 @@ const App = () => {
           <Route path="/profile" element={<ProfilePage currentUser={getCurrentUser()} />} />
           <Route path="/profile/:userId" element={<ProfilePage currentUser={getCurrentUser()} />} />
           <Route path="/chat" element={<ChatPage />} />
+          <Route path="/admin/unanswered" element={<AdminUnanswered />} />
         </Routes>
+
+        {/* Floating Chatbot Button */}
+        <button
+          onClick={() => setShowChatBot(true)}
+          className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40"
+          title="Ask Campus Assistant"
+        >
+          <MessageCircle className="w-6 h-6" />
+        </button>
+
+        {/* Chatbot Modal */}
+        {showChatBot && (
+          <ChatBot currentUser={getCurrentUser()} onClose={() => setShowChatBot(false)} />
+        )}
       </div>
     </Router>
     </ToastProvider>

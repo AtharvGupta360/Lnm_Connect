@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 
+// WebSocket connection URL
 const SOCKET_URL = 'http://localhost:8080/ws';
 
 export const useWebSocket = (userId) => {

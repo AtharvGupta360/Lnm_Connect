@@ -54,11 +54,21 @@ public class CampusBuzzController {
      * Get upcoming events
      */
     @GetMapping("/upcoming")
-    public ResponseEntity<List<CampusBuzz>> getUpcomingEvents() {
-        long currentTime = System.currentTimeMillis();
-        List<CampusBuzz> upcoming = campusBuzzRepository.findUpcomingEvents(currentTime);
-        upcoming.sort(Comparator.comparingLong(CampusBuzz::getEventDate));
-        return ResponseEntity.ok(upcoming.stream().limit(10).collect(Collectors.toList()));
+    public ResponseEntity<?> getUpcomingEvents() {
+        try {
+            long currentTime = System.currentTimeMillis();
+            List<CampusBuzz> upcoming = campusBuzzRepository.findUpcomingEvents(currentTime);
+            if (upcoming == null) {
+                upcoming = new ArrayList<>();
+            }
+            upcoming.sort(Comparator.comparingLong(CampusBuzz::getEventDate));
+            return ResponseEntity.ok(upcoming.stream().limit(10).collect(Collectors.toList()));
+        } catch (Exception e) {
+            System.err.println("Error fetching upcoming events: " + e.getMessage());
+            e.printStackTrace();
+            // Return empty list instead of error to prevent frontend crash
+            return ResponseEntity.ok(new ArrayList<>());
+        }
     }
 
     /**

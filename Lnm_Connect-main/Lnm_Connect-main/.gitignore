@@ -1,0 +1,66 @@
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.env
+.vscode/
+.DS_Store
+chatbot_backend/lnm_data/*.txt
+chatbot_backend/lnm_data/*.md
+chatbot_backend/lnm_data/*.pdf
+chatbot_backend/.venv/
+chatbot_backend/__pycache__/
+chatbot_backend/tests/__pycache__/ 
+chatbot_backend/.env
+chatbot_backend/*.md
+frontend/node_modules/
+frontend/build/
+# Java / JVM artifacts for backend/
+# Compiled class files
+backend/**/*.class
+
+# Build output
+backend/target/
+backend/build/
+backend/out/
+backend/bin/
+
+# Gradle
+backend/.gradle/
+backend/.gradle-test/
+backend/.gradle-cache/
+
+# Maven wrapper and caches (but not wrapper scripts)
+backend/.mvn/
+backend/.repository/
+
+# Package files
+backend/*.jar
+backend/*.war
+backend/*.ear
+backend/*.nar
+backend/*.zip
+backend/*.tar.gz
+
+# IDEs
+backend/.idea/
+backend/*.iml
+backend/.classpath
+backend/.project
+backend/.settings/
+
+# NetBeans
+backend/nbproject/private/
+
+# Logs and temp files
+backend/*.log
+backend/*.tmp
+backend/*.temp
+backend/*.bak
+
+# Generated sources
+backend/generated/
+backend/buildSrc/
+
+# OS files
+backend/.DS_Store
