@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Bot, User, Loader, Sparkles, RefreshCw, X } from 'lucide-react';
+import { Send, Bot, User, Loader, Sparkles, RefreshCw, X, Maximize2, Minimize2 } from 'lucide-react';
 
 // Allow overriding the API URL via Vite env variable VITE_API_URL (e.g. VITE_API_URL=http://localhost:8000/api)
 const API_URL = import.meta?.env?.VITE_API_URL || 'http://localhost:8000/api';
@@ -11,7 +11,11 @@ const ChatBot = ({ currentUser, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [size, setSize] = useState({ width: 420, height: 600 });
+  const [isResizing, setIsResizing] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const messagesEndRef = useRef(null);
+  const chatBotRef = useRef(null);
 
   // Initial greeting
   useEffect(() => {
@@ -132,16 +136,65 @@ const ChatBot = ({ currentUser, onClose }) => {
       });
   };
 
+  const handleResize = (e, direction) => {
+    e.preventDefault();
+    setIsResizing(true);
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = size.width;
+    const startHeight = size.height;
+
+    const handleMouseMove = (e) => {
+      const deltaX = startX - e.clientX; // Reversed because it's on the right
+      const deltaY = startY - e.clientY; // Reversed because it's on the bottom
+
+      let newWidth = startWidth;
+      let newHeight = startHeight;
+
+      if (direction.includes('left')) {
+        newWidth = Math.max(350, Math.min(800, startWidth + deltaX));
+      }
+      if (direction.includes('top')) {
+        newHeight = Math.max(400, Math.min(900, startHeight + deltaY));
+      }
+
+      setSize({ width: newWidth, height: newHeight });
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col"
-      >
+    <motion.div
+      ref={chatBotRef}
+      initial={{ scale: 0.9, opacity: 0, y: 20 }}
+      animate={{ scale: 1, opacity: 1, y: 0 }}
+      exit={{ scale: 0.9, opacity: 0, y: 20 }}
+      transition={{ type: "spring", damping: 25, stiffness: 300 }}
+      style={isFullscreen ? {} : { 
+        width: `${size.width}px`, 
+        height: `${size.height}px`,
+        minWidth: '350px',
+        minHeight: '400px',
+        maxWidth: '800px',
+        maxHeight: '900px'
+      }}
+      className={isFullscreen 
+        ? "fixed inset-0 bg-white flex flex-col z-50 rounded-none" 
+        : "fixed bottom-24 right-6 bg-white rounded-2xl shadow-2xl flex flex-col z-50"
+      }
+    >
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
+        <div className={`bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-4 flex items-center justify-between ${
+          isFullscreen ? '' : 'rounded-t-2xl'
+        }`}>
           <div className="flex items-center space-x-3">
             <div className="relative">
               <Bot className="w-8 h-8" />
@@ -159,6 +212,13 @@ const ChatBot = ({ currentUser, onClose }) => {
               title="New conversation"
             >
               <RefreshCw className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="p-2 hover:bg-white/10 rounded-lg transition"
+              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            >
+              {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
             </button>
             <button
               onClick={onClose}
@@ -321,8 +381,40 @@ const ChatBot = ({ currentUser, onClose }) => {
             </button>
           </div>
         </div>
+
+        {/* Resize Handles - Hidden in fullscreen */}
+        {!isFullscreen && (
+          <>
+            {/* Top-Left Corner */}
+            <div
+              onMouseDown={(e) => handleResize(e, 'top-left')}
+              className="absolute top-0 left-0 w-4 h-4 cursor-nwse-resize hover:bg-indigo-200 transition-colors rounded-tl-2xl"
+              style={{ zIndex: 60 }}
+            />
+            
+            {/* Top Edge */}
+            <div
+              onMouseDown={(e) => handleResize(e, 'top')}
+              className="absolute top-0 left-4 right-4 h-2 cursor-ns-resize hover:bg-indigo-200 transition-colors"
+              style={{ zIndex: 60 }}
+            />
+            
+            {/* Left Edge */}
+            <div
+              onMouseDown={(e) => handleResize(e, 'left')}
+              className="absolute top-4 bottom-4 left-0 w-2 cursor-ew-resize hover:bg-indigo-200 transition-colors"
+              style={{ zIndex: 60 }}
+            />
+            
+            {/* Resize indicator in bottom-left corner */}
+            <div className="absolute bottom-2 left-2 text-gray-400 pointer-events-none select-none text-xs">
+              <svg width="16" height="16" viewBox="0 0 16 16" className="rotate-90">
+                <path d="M14 14L14 10M14 14L10 14M14 14L8 8M14 6L6 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+          </>
+        )}
       </motion.div>
-    </div>
   );
 };
 

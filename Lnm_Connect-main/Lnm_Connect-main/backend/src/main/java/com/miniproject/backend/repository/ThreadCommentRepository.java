@@ -45,4 +45,9 @@ public interface ThreadCommentRepository extends MongoRepository<ThreadComment, 
      * Find comments by author
      */
     List<ThreadComment> findByAuthorIdAndIsDeletedFalseOrderByCreatedAtDesc(String authorId);
+    
+    /**
+     * Find all comments for a thread ordered by creation date
+     */
+    List<ThreadComment> findByThreadIdAndIsDeletedOrderByCreatedAtAsc(String threadId, Boolean isDeleted);
 }

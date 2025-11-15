@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, Users, MessageSquare, TrendingUp, 
   Plus, Lock, Settings, UserPlus, UserMinus, X,
-  Edit, Trash2, Pin, LockKeyhole, AlertCircle
+  Edit, Trash2, Pin, LockKeyhole, AlertCircle,
+  ArrowUp, ArrowDown
 } from 'lucide-react';
 import { spaceService } from '../services/spaceService';
 import { threadService } from '../services/threadService';
@@ -32,6 +33,9 @@ const SpaceDetailPage = () => {
     try {
       setLoading(true);
       const data = await spaceService.getSpaceById(spaceId, currentUserId);
+      console.log('Loaded space data:', data);
+      console.log('Space memberIds:', data.memberIds);
+      console.log('Space memberCount:', data.memberCount);
       setSpace(data);
       
       // Load threads for this space
@@ -291,6 +295,9 @@ const SpaceDetailPage = () => {
  */
 const ThreadCard = ({ thread, space, currentUserId, onRefresh }) => {
   const [showActions, setShowActions] = useState(false);
+  const [userVote, setUserVote] = useState(0); // 0 = no vote, 1 = upvote, -1 = downvote
+  const [voteScore, setVoteScore] = useState(thread.voteScore || 0);
+  const [isVoting, setIsVoting] = useState(false);
   const navigate = useNavigate();
   
   const handleDelete = async () => {
@@ -325,6 +332,38 @@ const ThreadCard = ({ thread, space, currentUserId, onRefresh }) => {
     } catch (error) {
       console.error('Error toggling lock:', error);
       alert('Failed to update lock status: ' + (error.response?.data?.message || error.message));
+    }
+  };
+  
+  const handleVote = async (value) => {
+    if (isVoting) return;
+    
+    try {
+      setIsVoting(true);
+      
+      // If clicking the same vote, toggle it off
+      const newValue = userVote === value ? 0 : value;
+      
+      // Optimistic update
+      const scoreDiff = newValue - userVote;
+      setVoteScore(voteScore + scoreDiff);
+      setUserVote(newValue);
+      
+      if (newValue === 0) {
+        // Remove vote (toggle off)
+        await threadService.voteThread(currentUserId, thread.id, value);
+      } else {
+        // Add or change vote
+        await threadService.voteThread(currentUserId, thread.id, newValue);
+      }
+    } catch (error) {
+      console.error('Error voting on thread:', error);
+      // Revert optimistic update on error
+      setVoteScore(thread.voteScore || 0);
+      setUserVote(0);
+      alert('Failed to vote: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setIsVoting(false);
     }
   };
   
@@ -418,11 +457,44 @@ const ThreadCard = ({ thread, space, currentUserId, onRefresh }) => {
           <span>•</span>
           <span>{thread.viewCount} views</span>
         </div>
-        <div className="flex items-center gap-2">
-          <TrendingUp className="w-4 h-4" />
-          <span className={thread.voteScore > 0 ? 'text-green-600 font-semibold' : thread.voteScore < 0 ? 'text-red-600 font-semibold' : ''}>
-            {thread.voteScore}
+        
+        {/* Vote buttons */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleVote(1);
+            }}
+            disabled={isVoting}
+            className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${
+              userVote === 1
+                ? 'bg-green-100 text-green-700'
+                : 'hover:bg-gray-100 text-gray-600'
+            } ${isVoting ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <ArrowUp className="w-4 h-4" />
+          </button>
+          
+          <span className={`font-semibold min-w-[2rem] text-center ${
+            voteScore > 0 ? 'text-green-600' : voteScore < 0 ? 'text-red-600' : 'text-gray-600'
+          }`}>
+            {voteScore}
           </span>
+          
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleVote(-1);
+            }}
+            disabled={isVoting}
+            className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${
+              userVote === -1
+                ? 'bg-red-100 text-red-700'
+                : 'hover:bg-gray-100 text-gray-600'
+            } ${isVoting ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <ArrowDown className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </motion.div>
@@ -555,13 +627,120 @@ const NewThreadModal = ({ spaceId, onClose, onSuccess }) => {
  * Manage Space Modal Component
  */
 const ManageSpaceModal = ({ space, onClose, onSuccess }) => {
-  const [activeTab, setActiveTab] = useState('info'); // 'info', 'settings', 'moderators'
+  const [activeTab, setActiveTab] = useState('info'); // 'info', 'settings', 'moderators', 'members'
   const [editFormData, setEditFormData] = useState({
     description: space.description || '',
     rules: space.rules?.join('\n') || '',
     tags: space.tags?.join(', ') || ''
   });
   const [loading, setLoading] = useState(false);
+  const [newModeratorId, setNewModeratorId] = useState('');
+  const [members, setMembers] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const currentUserId = currentUser.id || currentUser._id;
+  const isCreator = space.creatorId === currentUserId;
+  
+  // Load members when members tab is opened
+  useEffect(() => {
+    if (activeTab === 'members' && space.memberIds) {
+      loadMembers();
+    }
+  }, [activeTab, space.memberIds]);
+  
+  const loadMembers = async () => {
+    setLoadingMembers(true);
+    try {
+      console.log('Loading members for space:', space);
+      console.log('Space memberIds:', space.memberIds);
+      
+      if (!space.memberIds || space.memberIds.length === 0) {
+        console.log('No members in this space');
+        setMembers([]);
+        setLoadingMembers(false);
+        return;
+      }
+      
+      // Fetch members directly from the space members endpoint
+      const response = await fetch(`http://localhost:8080/api/spaces/${space.id}/members`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const spaceMembers = await response.json();
+      console.log('Space members from API:', spaceMembers.length, spaceMembers);
+      setMembers(spaceMembers);
+      
+      if (spaceMembers.length === 0) {
+        console.warn('No members returned from API for space:', space.id);
+      }
+    } catch (error) {
+      console.error('Error loading members:', error);
+      alert('Failed to load members. Check console for details.');
+      setMembers([]);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+  
+  const handleDeleteSpace = async () => {
+    if (!window.confirm('⚠️ Are you sure you want to delete this space? This will permanently delete all threads, comments, and data. This action CANNOT be undone!')) return;
+    if (!window.confirm('This is your final warning. All content will be lost forever. Are you absolutely sure?')) return;
+    
+    setLoading(true);
+    try {
+      await spaceService.deleteSpace(space.id, currentUserId);
+      alert('Space deleted successfully! 🗑️');
+      window.location.href = '/spaces'; // Navigate to spaces list
+    } catch (error) {
+      console.error('Error deleting space:', error);
+      alert('Failed to delete space: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleAddModerator = async () => {
+    if (!newModeratorId.trim()) {
+      alert('Please enter a user ID');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      await spaceService.addModerator(space.id, currentUserId, newModeratorId.trim());
+      alert('Moderator added successfully! ✅');
+      setNewModeratorId('');
+      onSuccess();
+    } catch (error) {
+      console.error('Error adding moderator:', error);
+      const errorMsg = error.response?.data?.message || error.response?.data || error.message;
+      if (errorMsg.includes('member')) {
+        alert('❌ Failed to add moderator:\n\nThe user must be a MEMBER of this space first!\n\nSteps:\n1. User must join this space\n2. Then you can promote them to moderator\n\nError: ' + errorMsg);
+      } else {
+        alert('Failed to add moderator:\n' + errorMsg);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleRemoveModerator = async (moderatorId) => {
+    if (!window.confirm('Remove this user as a moderator?')) return;
+    
+    setLoading(true);
+    try {
+      await spaceService.removeModerator(space.id, currentUserId, moderatorId);
+      alert('Moderator removed successfully! 🗑️');
+      onSuccess();
+    } catch (error) {
+      console.error('Error removing moderator:', error);
+      alert('Failed to remove moderator: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const handleSaveSettings = async () => {
     setLoading(true);
@@ -601,7 +780,7 @@ const ManageSpaceModal = ({ space, onClose, onSuccess }) => {
           
           {/* Tabs */}
           <div className="flex gap-2">
-            {['info', 'settings', 'moderators'].map((tab) => (
+            {['info', 'settings', 'moderators', 'members'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -716,55 +895,235 @@ const ManageSpaceModal = ({ space, onClose, onSuccess }) => {
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Moderator Management</h3>
               
+              {/* Info Box */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-semibold mb-1">How to add moderators:</p>
+                    <ol className="list-decimal ml-4 space-y-1">
+                      <li>User must <strong>join this space first</strong> (be a member)</li>
+                      <li>Copy their user ID from their profile or member list</li>
+                      <li>Paste the ID below and click "Add"</li>
+                    </ol>
+                    <p className="mt-2 text-xs">💡 Tip: Users can find their ID in their profile settings</p>
+                  </div>
+                </div>
+              </div>
+              
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-sm text-gray-600 mb-4">
-                  Current moderators have the ability to pin/lock threads, delete posts, and manage the space.
+                  Moderators can pin/lock threads and manage discussions. Only the creator can add or remove moderators.
                 </p>
+                
+                {/* Space Stats */}
+                <div className="grid grid-cols-2 gap-4 mb-4 p-3 bg-white rounded-lg border border-gray-200">
+                  <div>
+                    <p className="text-xs text-gray-600">Total Members</p>
+                    <p className="text-2xl font-bold text-indigo-600">{space.memberCount || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600">Moderators</p>
+                    <p className="text-2xl font-bold text-green-600">{space.moderatorIds?.length || 0}</p>
+                  </div>
+                </div>
                 
                 <div className="space-y-2 mb-4">
                   <h4 className="font-semibold text-gray-700">Current Moderators ({space.moderatorIds?.length || 0})</h4>
-                  <div className="bg-white rounded-lg border border-gray-200 p-3">
+                  <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
                     {space.moderatorIds && space.moderatorIds.length > 0 ? (
-                      <ul className="space-y-2">
-                        {space.moderatorIds.map((modId, idx) => (
-                          <li key={idx} className="flex items-center justify-between">
-                            <span className="text-gray-700">Moderator #{idx + 1}</span>
-                            <span className="text-xs text-gray-500">{modId.substring(0, 8)}...</span>
-                          </li>
-                        ))}
-                      </ul>
+                      space.moderatorIds.map((modId, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-3">
+                          <div>
+                            <span className="font-medium text-gray-900">Moderator</span>
+                            <p className="text-xs text-gray-500 font-mono">{modId.substring(0, 24)}...</p>
+                          </div>
+                          {isCreator && modId !== space.creatorId && (
+                            <button
+                              onClick={() => handleRemoveModerator(modId)}
+                              disabled={loading}
+                              className="text-red-600 hover:text-red-800 text-sm font-semibold flex items-center gap-1 disabled:opacity-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Remove
+                            </button>
+                          )}
+                          {modId === space.creatorId && (
+                            <span className="text-xs text-indigo-600 font-semibold bg-indigo-50 px-2 py-1 rounded">Creator</span>
+                          )}
+                        </div>
+                      ))
                     ) : (
-                      <p className="text-gray-500">No moderators</p>
+                      <div className="p-4 text-center text-gray-500">No moderators yet</div>
                     )}
                   </div>
                 </div>
                 
-                <div className="space-y-2">
-                  <h4 className="font-semibold text-gray-700">Add New Moderator</h4>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Enter user ID..."
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <button
-                      onClick={() => alert('Add moderator feature: Backend implementation required')}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700"
-                    >
-                      Add
-                    </button>
+                {(isCreator || space.moderatorIds?.includes(currentUserId)) && (
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-gray-700">Add New Moderator</h4>
+                    <p className="text-xs text-gray-600 mb-2">
+                      ⚠️ <strong>Important:</strong> Enter the user ID of someone who has <strong>already joined</strong> this space
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newModeratorId}
+                        onChange={(e) => setNewModeratorId(e.target.value)}
+                        placeholder="Paste user ID here... (must be a member)"
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+                      />
+                      <button
+                        onClick={handleAddModerator}
+                        disabled={loading || !newModeratorId.trim()}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loading ? 'Adding...' : 'Add'}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 italic">
+                      💡 The user must join the space first. They can join from the space main page.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {!isCreator && !space.moderatorIds?.includes(currentUserId) && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-semibold text-yellow-800 mb-1">Restricted Access</h4>
+                      <p className="text-sm text-yellow-700">
+                        Only the space creator and moderators can manage moderators.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Members Tab */}
+          {activeTab === 'members' && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Space Members</h3>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <Users className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-semibold mb-1">Member Information</p>
+                    <p>View all members of this space along with their user IDs. You can copy user IDs to add them as moderators.</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              {/* Members Stats */}
+              <div className="grid grid-cols-3 gap-4 mb-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-200">
+                <div className="text-center">
+                  <p className="text-xs text-gray-600 mb-1">Total Members</p>
+                  <p className="text-3xl font-bold text-indigo-600">{space.memberCount || 0}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-600 mb-1">Moderators</p>
+                  <p className="text-3xl font-bold text-green-600">{space.moderatorIds?.length || 0}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-600 mb-1">Threads</p>
+                  <p className="text-3xl font-bold text-purple-600">{space.threadCount || 0}</p>
+                </div>
+              </div>
+
+              {/* Members List */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-semibold text-gray-700">All Members ({members.length})</h4>
+                  <button
+                    onClick={loadMembers}
+                    disabled={loadingMembers}
+                    className="text-sm text-indigo-600 hover:text-indigo-800 font-semibold"
+                  >
+                    {loadingMembers ? '🔄 Loading...' : '🔄 Refresh'}
+                  </button>
+                </div>
+                
+                {loadingMembers ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-2"></div>
+                    Loading members...
+                  </div>
+                ) : members.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    No members found
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200 max-h-96 overflow-y-auto">
+                    {members.map((member, idx) => {
+                      const memberId = member.id || member._id;
+                      const isModerator = space.moderatorIds?.includes(memberId);
+                      const isSpaceCreator = space.creatorId === memberId;
+                      const isCurrentUser = memberId === currentUserId;
+                      
+                      return (
+                        <div key={idx} className="p-4 hover:bg-gray-50 transition-colors">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                                  {(member.name || 'U').charAt(0).toUpperCase()}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-semibold text-gray-900 truncate">{member.name || 'Member'}</p>
+                                    {isSpaceCreator && (
+                                      <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded font-semibold">CREATOR</span>
+                                    )}
+                                    {isModerator && !isSpaceCreator && (
+                                      <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded font-semibold">MOD</span>
+                                    )}
+                                    {isCurrentUser && (
+                                      <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded font-semibold">YOU</span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-gray-500 truncate">{member.email || 'N/A'}</p>
+                                </div>
+                              </div>
+                              
+                              {/* User ID - Click to Copy */}
+                              <div className="ml-12 mt-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-gray-500 font-semibold">User ID:</span>
+                                  <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono text-gray-700 break-all">
+                                    {memberId}
+                                  </code>
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(memberId);
+                                      alert('User ID copied to clipboard! 📋\n\n' + memberId);
+                                    }}
+                                    className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold bg-indigo-50 px-2 py-1 rounded hover:bg-indigo-100"
+                                    title="Copy user ID"
+                                  >
+                                    📋 Copy
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-semibold text-yellow-800 mb-1">Note</h4>
-                    <p className="text-sm text-yellow-700">
-                      Full moderator management features (add/remove moderators) will be implemented in the backend soon.
-                    </p>
+                  <AlertCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-green-800">
+                    <p className="font-semibold mb-1">💡 Tip: Adding Moderators</p>
+                    <p>Click the "📋 Copy" button next to any member's user ID, then go to the "Moderators" tab and paste it to promote them!</p>
                   </div>
                 </div>
               </div>
@@ -773,12 +1132,24 @@ const ManageSpaceModal = ({ space, onClose, onSuccess }) => {
         </div>
 
         <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-6">
-          <button
-            onClick={onClose}
-            className="w-full px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300"
-          >
-            Close
-          </button>
+          <div className="flex gap-3">
+            {isCreator && (
+              <button
+                onClick={handleDeleteSpace}
+                disabled={loading}
+                className="px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                <Trash2 className="w-5 h-5" />
+                Delete Space
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </motion.div>
     </div>

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ensureArray } from "./utils";
 import { motion } from "framer-motion";
-import { FaUserCircle, FaGraduationCap, FaPhone, FaEnvelope, FaUniversity, FaEdit, FaPlus, FaCertificate } from "react-icons/fa";
+import { FaUserCircle, FaGraduationCap, FaPhone, FaEnvelope, FaUniversity, FaEdit, FaPlus, FaCertificate, FaTrash } from "react-icons/fa";
 import MessageButton from "./components/MessageButton";
 import FollowButton from "./components/FollowButton";
 
@@ -28,6 +28,20 @@ const ProfilePage = ({ currentUser }) => {
   // Predefined skills/interests (extend as needed)
   const [allSkills] = useState(["Java", "C++", "Python", "Machine Learning", "Web Development", "React", "Node.js", "Data Science", "Cloud", "AWS", "Spring Boot", "MongoDB"]);
   const [allInterests] = useState(["AI", "Robotics", "Open Source", "Startups", "Design", "UI/UX", "Blockchain", "Cybersecurity", "Competitive Programming", "App Development", "Research", "Entrepreneurship"]);
+
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm('Are you sure you want to delete this post?')) return;
+    
+    try {
+      const { postService } = await import('./services/postService');
+      await postService.deletePost(postId, currentUser?.id);
+      setPosts(posts.filter(p => p.id !== postId && p._id !== postId));
+      alert('Post deleted successfully! 🗑️');
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      alert('Failed to delete post: ' + (error.response?.data?.message || error.message));
+    }
+  };
 
   useEffect(() => {
     if (!userId) {
@@ -455,14 +469,26 @@ const ProfilePage = ({ currentUser }) => {
           <div className="space-y-6">
             {ensureArray(posts).map((post, idx) => (
               <motion.div key={post.id || post._id || idx} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="bg-white rounded-xl shadow border p-6">
-                <div className="flex items-center space-x-3 mb-2">
-                  <div className="w-10 h-10 bg-indigo-200 rounded-full flex items-center justify-center text-indigo-700 font-bold text-lg">
-                    {user.name?.charAt(0).toUpperCase()}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-indigo-200 rounded-full flex items-center justify-center text-indigo-700 font-bold text-lg">
+                      {user.name?.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <span className="font-medium text-slate-900">{user.name}</span>
+                      <span className="ml-2 text-xs text-slate-400">{new Date(post.createdAt).toLocaleString()}</span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-medium text-slate-900">{user.name}</span>
-                    <span className="ml-2 text-xs text-slate-400">{new Date(post.createdAt).toLocaleString()}</span>
-                  </div>
+                  {/* Delete button - only show if viewing own profile */}
+                  {userId === currentUser?.id && (
+                    <button
+                      onClick={() => handleDeletePost(post.id || post._id)}
+                      className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                      title="Delete post"
+                    >
+                      <FaTrash className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
                 {post.tags && post.tags.length > 0 && (
                   <div className="mb-2 flex flex-wrap gap-2">

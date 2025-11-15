@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle, Loader2, Users, X, Eye, MessageCircle, Home, UserCircle, Mail, LogOut, Sparkles, UserCheck, Bell, MessageSquare } from "lucide-react";
+import { CheckCircle, Loader2, Users, X, Eye, MessageCircle, Home, UserCircle, Mail, LogOut, Sparkles, UserCheck, Bell, MessageSquare, Trash2, Reply, FileText } from "lucide-react";
 import SignupDetails from "./SignupDetails";
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import ProfilePage from "./ProfilePage";
@@ -33,33 +33,45 @@ const POST_TAGS = [
 ];
 
 // Professional Header Navigation Component
-const HeaderNav = ({ username, handleLogout }) => {
+const HeaderNav = ({ username, handleLogout, onOpenTagsModal }) => {
   const location = useLocation();
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [unreadTagsCount, setUnreadTagsCount] = useState(0);
   
   const isActive = (path) => {
     return location.pathname === path;
   };
 
-  // Load pending requests count
+  // Load pending requests count and tags count
   useEffect(() => {
-    const loadPendingRequests = async () => {
+    const loadCounts = async () => {
       try {
         const user = localStorage.getItem('user');
         if (user) {
           const currentUser = JSON.parse(user);
           const requests = await followService.getPendingRequests(currentUser.id);
           setPendingRequestsCount(requests.length);
+          
+          // Load unread tags count
+          try {
+            const tagsResponse = await fetch(`http://localhost:8080/api/tags/user/${currentUser.id}/count`);
+            if (tagsResponse.ok) {
+              const data = await tagsResponse.json();
+              setUnreadTagsCount(data.count || 0);
+            }
+          } catch (err) {
+            console.error('Error loading tags count:', err);
+          }
         }
       } catch (error) {
-        console.error('Error loading pending requests:', error);
+        console.error('Error loading counts:', error);
       }
     };
 
-    loadPendingRequests();
+    loadCounts();
     
     // Refresh every 30 seconds
-    const interval = setInterval(loadPendingRequests, 30000);
+    const interval = setInterval(loadCounts, 30000);
     return () => clearInterval(interval);
   }, [location.pathname]); // Reload when navigation changes
 
@@ -105,31 +117,42 @@ const HeaderNav = ({ username, handleLogout }) => {
               whileTap={{ scale: 0.95 }}
               className={`flex items-center space-x-1.5 px-2.5 py-2 rounded-lg transition-all duration-200 ${
                 isActive(path)
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-indigo-600'
+                  ? 'bg-indigo-50 text-indigo-600'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }`}
             >
               <Icon className="w-4 h-4" />
-              <span className="font-semibold text-xs">{label}</span>
+              <span className="text-xs font-semibold whitespace-nowrap">{label}</span>
               {badge > 0 && (
-                <motion.span
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg"
-                >
-                  {badge > 9 ? '9+' : badge}
-                </motion.span>
+                <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
+                  {badge > 99 ? '99+' : badge}
+                </span>
               )}
             </motion.div>
-            {isActive(path) && (
-              <motion.div
-                layoutId="activeTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-600 to-purple-600"
-                initial={false}
-              />
-            )}
           </Link>
         ))}
+        {/* Tags Button (opens modal) */}
+        <button 
+          onClick={() => {
+            console.log('Tags button clicked!');
+            onOpenTagsModal();
+          }} 
+          className="relative group"
+        >
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center space-x-1.5 px-2.5 py-2 rounded-lg transition-all duration-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+          >
+            <Bell className="w-4 h-4" />
+            <span className="text-xs font-semibold whitespace-nowrap">Tags</span>
+            {unreadTagsCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
+                {unreadTagsCount > 99 ? '99+' : unreadTagsCount}
+              </span>
+            )}
+          </motion.div>
+        </button>
       </nav>
 
       {/* User Info & Logout - Compact */}
@@ -179,16 +202,21 @@ const HeaderNav = ({ username, handleLogout }) => {
 };
 
 // HomeContent Component - wraps homepage content with scroll-to-post functionality
-const HomeContent = ({ children, posts, postRefs, highlightedPost }) => {
+const HomeContent = ({ children, posts, postRefs, highlightedPost, setHighlightedPost }) => {
   const [searchParams] = useSearchParams();
 
   // Scroll to post when postId is in URL
   useEffect(() => {
     const postId = searchParams.get('postId');
     if (postId && posts.length > 0) {
+      console.log('Scrolling to post:', postId);
+      // Set highlighted post
+      setHighlightedPost(postId);
+      
       // Wait a bit for posts to render
       const timer = setTimeout(() => {
         const element = postRefs.current[postId];
+        console.log('Found element:', element);
         if (element) {
           element.scrollIntoView({ 
             behavior: 'smooth', 
@@ -196,9 +224,18 @@ const HomeContent = ({ children, posts, postRefs, highlightedPost }) => {
           });
         }
       }, 300);
-      return () => clearTimeout(timer);
+      
+      // Clear highlight after 3 seconds
+      const highlightTimer = setTimeout(() => {
+        setHighlightedPost(null);
+      }, 3000);
+      
+      return () => {
+        clearTimeout(timer);
+        clearTimeout(highlightTimer);
+      };
     }
-  }, [searchParams, posts, postRefs]);
+  }, [searchParams, posts, postRefs, setHighlightedPost]);
 
   return children;
 };
@@ -240,6 +277,16 @@ const App = () => {
   
   // ChatBot state
   const [showChatBot, setShowChatBot] = useState(false);
+  const [chatBotPosition, setChatBotPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  
+  // Tags Modal state
+  const [showTagsModal, setShowTagsModal] = useState(false);
+  
+  // Debug: Log when showTagsModal changes
+  useEffect(() => {
+    console.log('showTagsModal changed to:', showTagsModal);
+  }, [showTagsModal]);
 
   // Handle extended signup details after signup
   const handleSignupDetails = async (details) => {
@@ -643,11 +690,11 @@ const App = () => {
       <Router>
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
           {/* Enhanced Header */}
-          <HeaderNav username={username} handleLogout={handleLogout} />
+          <HeaderNav username={username} handleLogout={handleLogout} onOpenTagsModal={() => setShowTagsModal(true)} />
 
         <Routes>
           <Route path="/" element={
-            <HomeContent posts={posts} postRefs={postRefs} highlightedPost={highlightedPost}>
+            <HomeContent posts={posts} postRefs={postRefs} highlightedPost={highlightedPost} setHighlightedPost={setHighlightedPost}>
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                   {/* Left Sidebar - Profile (3 columns) */}
@@ -737,16 +784,40 @@ const App = () => {
                             </motion.div>
                           </Link>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <Link 
-                                to={`/profile/${post.authorId || post.id}`} 
-                                className="font-bold text-gray-900 hover:text-indigo-600 transition-colors"
-                              >
-                                {post.user}
-                              </Link>
-                              <span className="text-sm text-gray-500">@{post.username}</span>
-                              <span className="text-sm text-gray-400">•</span>
-                              <span className="text-sm text-gray-500">{post.timestamp}</span>
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center space-x-2">
+                                <Link 
+                                  to={`/profile/${post.authorId || post.id}`} 
+                                  className="font-bold text-gray-900 hover:text-indigo-600 transition-colors"
+                                >
+                                  {post.user}
+                                </Link>
+                                <span className="text-sm text-gray-500">@{post.username}</span>
+                                <span className="text-sm text-gray-400">•</span>
+                                <span className="text-sm text-gray-500">{post.timestamp}</span>
+                              </div>
+                              {/* Delete button - only show for post author */}
+                              {post.authorId === getUserId() && (
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={async () => {
+                                    if (!window.confirm('Are you sure you want to delete this post?')) return;
+                                    try {
+                                      const postService = await import('./services/postService').then(m => m.postService);
+                                      await postService.deletePost(post.id, getUserId());
+                                      setPosts(posts => posts.filter(p => p.id !== post.id));
+                                      alert('Post deleted successfully! 🗑️');
+                                    } catch (error) {
+                                      alert('Failed to delete post: ' + (error.response?.data?.message || error.message));
+                                    }
+                                  }}
+                                  className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                                  title="Delete post"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </motion.button>
+                              )}
                             </div>
                             <h3 className="text-lg font-bold text-gray-900 mt-2 mb-2">{post.title}</h3>
                             {post.tags && post.tags.length > 0 && (
@@ -807,9 +878,24 @@ const App = () => {
                                       {c.userName ? c.userName.charAt(0).toUpperCase() : '?'}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                      <div className="flex items-center space-x-2">
-                                        <span className="font-semibold text-gray-900 text-sm">{c.userName || 'User'}</span>
-                                        <span className="text-xs text-gray-400">{new Date(c.timestamp).toLocaleString()}</span>
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-2">
+                                          <span className="font-semibold text-gray-900 text-sm">{c.userName || 'User'}</span>
+                                          <span className="text-xs text-gray-400">{new Date(c.timestamp).toLocaleString()}</span>
+                                        </div>
+                                        <button
+                                          onClick={() => {
+                                            const replyText = `@${c.userName} `;
+                                            setPosts(posts => posts.map(p => 
+                                              p.id === post.id ? { ...p, commentInput: replyText } : p
+                                            ));
+                                          }}
+                                          className="text-indigo-600 hover:text-indigo-800 text-xs font-semibold flex items-center gap-1"
+                                          title="Reply to comment"
+                                        >
+                                          <Reply className="w-3 h-3" />
+                                          Reply
+                                        </button>
                                       </div>
                                       <div className="text-gray-700 text-sm mt-1">{c.text}</div>
                                     </div>
@@ -865,24 +951,326 @@ const App = () => {
           <Route path="/admin/unanswered" element={<AdminUnanswered />} />
         </Routes>
 
-        {/* Floating Chatbot Button */}
-        <button
-          onClick={() => setShowChatBot(true)}
-          className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40"
+        {/* Floating Chatbot Button - Draggable */}
+        <motion.button
+          drag
+          dragMomentum={false}
+          dragElastic={0}
+          dragConstraints={{
+            left: -window.innerWidth + 80,
+            right: 0,
+            top: -window.innerHeight + 80,
+            bottom: 0
+          }}
+          onDragStart={() => setIsDragging(true)}
+          onDragEnd={() => {
+            setTimeout(() => setIsDragging(false), 100);
+          }}
+          onClick={(e) => {
+            if (!isDragging) {
+              setShowChatBot(true);
+            }
+          }}
+          className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40 cursor-grab active:cursor-grabbing"
           title="Ask Campus Assistant"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
         >
           <MessageCircle className="w-6 h-6" />
-        </button>
+        </motion.button>
 
         {/* Chatbot Modal */}
-        {showChatBot && (
-          <ChatBot currentUser={getCurrentUser()} onClose={() => setShowChatBot(false)} />
-        )}
+        <AnimatePresence>
+          {showChatBot && (
+            <ChatBot currentUser={getCurrentUser()} onClose={() => setShowChatBot(false)} />
+          )}
+        </AnimatePresence>
+
+        {/* Tags Modal */}
+        <AnimatePresence>
+          {showTagsModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                console.log('Closing modal from backdrop');
+                setShowTagsModal(false);
+              }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-hidden"
+              >
+                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Bell className="w-8 h-8" />
+                      <h2 className="text-2xl font-bold">Your Tags</h2>
+                    </div>
+                    <button
+                      onClick={() => setShowTagsModal(false)}
+                      className="p-2 hover:bg-white/20 rounded-full transition-colors"
+                    >
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <TagsModalContent currentUser={getCurrentUser()} onClose={() => setShowTagsModal(false)} />
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </Router>
     </ToastProvider>
   );
 };
+
+// --- TAGS MODAL CONTENT COMPONENT ---
+function TagsModalContent({ currentUser, onClose }) {
+  const [tags, setTags] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
+  const [taggerNames, setTaggerNames] = useState({});
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    loadTags();
+  }, [filter]);
+
+  const loadTags = async () => {
+    setLoading(true);
+    try {
+      console.log('Loading tags for user:', currentUser);
+      
+      if (!currentUser || !currentUser.id) {
+        console.error('No current user found');
+        setLoading(false);
+        return;
+      }
+
+      const endpoint = filter === 'unread'
+        ? `http://localhost:8080/api/tags/user/${currentUser.id}/unread`
+        : `http://localhost:8080/api/tags/user/${currentUser.id}`;
+
+      console.log('Fetching tags from:', endpoint);
+      const response = await fetch(endpoint);
+      console.log('Tags response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Tags received:', data);
+        setTags(data);
+
+        // Fetch tagger names
+        const uniqueTaggerIds = [...new Set(data.map(tag => tag.taggerUserId))];
+        console.log('Unique tagger IDs:', uniqueTaggerIds);
+        
+        const names = {};
+        await Promise.all(
+          uniqueTaggerIds.map(async (userId) => {
+            try {
+              const userResponse = await fetch(`http://localhost:8080/api/auth/user/${userId}`);
+              if (userResponse.ok) {
+                const userData = await userResponse.json();
+                names[userId] = userData.name || 'Unknown User';
+                console.log(`Fetched user ${userId}: ${names[userId]}`);
+              }
+            } catch (err) {
+              console.error('Error fetching user:', err);
+              names[userId] = 'Unknown User';
+            }
+          })
+        );
+        setTaggerNames(names);
+        console.log('All tagger names:', names);
+      } else {
+        console.error('Failed to fetch tags:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error loading tags:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const markAsRead = async (tagIds) => {
+    try {
+      await fetch('http://localhost:8080/api/tags/mark-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tagIds })
+      });
+      loadTags();
+    } catch (error) {
+      console.error('Error marking tags as read:', error);
+    }
+  };
+
+  const handleTagClick = (tag) => {
+    if (!tag.isRead) {
+      markAsRead([tag.id]);
+    }
+    if (tag.contentType === 'post') {
+      navigate(`/?postId=${tag.contentId}`);
+      if (onClose) onClose();
+    } else if (tag.contentType === 'thread') {
+      navigate(`/threads/${tag.contentId}`);
+      if (onClose) onClose();
+    }
+  };
+
+  const getContentIcon = (contentType) => {
+    switch (contentType) {
+      case 'post':
+        return <FileText className="w-4 h-4" />;
+      case 'comment':
+        return <MessageCircle className="w-4 h-4" />;
+      case 'thread':
+        return <MessageSquare className="w-4 h-4" />;
+      default:
+        return <Bell className="w-4 h-4" />;
+    }
+  };
+
+  return (
+    <>
+      {/* Filter Tabs */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setFilter('all')}
+          className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+            filter === 'all'
+              ? 'bg-indigo-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          All Tags
+        </button>
+        <button
+          onClick={() => setFilter('unread')}
+          className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+            filter === 'unread'
+              ? 'bg-indigo-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          Unread
+        </button>
+      </div>
+
+      {/* Tags List */}
+      <div className="overflow-y-auto max-h-[calc(80vh-250px)]">
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Loading your tags...</p>
+            </div>
+          ) : tags.length === 0 ? (
+            <div className="text-center py-12">
+              <Bell className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No tags yet</h3>
+              <p className="text-gray-600">
+                {filter === 'unread'
+                  ? "You're all caught up! No unread mentions."
+                  : 'When someone tags you, it will appear here.'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {tags.map((tag) => (
+                <motion.div
+                  key={tag.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  onClick={() => handleTagClick(tag)}
+                  className={`bg-gray-50 rounded-xl p-4 cursor-pointer hover:bg-gray-100 transition-all ${
+                    !tag.isRead ? 'border-l-4 border-indigo-600' : ''
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    {/* Tagger Avatar */}
+                    <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
+                      {(taggerNames[tag.taggerUserId] || 'U')[0].toUpperCase()}
+                    </div>
+
+                    <div className="flex-1">
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-gray-900">
+                            {taggerNames[tag.taggerUserId] || 'Loading...'}
+                          </span>
+                          <span className="text-gray-500">tagged you in</span>
+                          {getContentIcon(tag.contentType)}
+                          <span className="text-sm font-semibold text-gray-700 capitalize">
+                            {tag.contentType}
+                          </span>
+                          {!tag.isRead && (
+                            <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full">
+                              New
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-sm text-gray-500 flex-shrink-0">
+                          {new Date(tag.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      {/* Content */}
+                      <p className="text-gray-700 mb-3 line-clamp-2 text-sm">
+                        {tag.content}
+                      </p>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-4">
+                        {!tag.isRead && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markAsRead([tag.id]);
+                            }}
+                            className="flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800 font-semibold"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            Mark as read
+                          </button>
+                        )}
+                        <button
+                          className="text-sm text-gray-600 hover:text-gray-900 font-semibold"
+                        >
+                          View {tag.contentType} →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+
+          {/* Mark All as Read */}
+          {tags.length > 0 && tags.some((tag) => !tag.isRead) && (
+            <div className="mt-6 text-center">
+              <button
+                onClick={() => markAsRead(tags.filter((t) => !t.isRead).map((t) => t.id))}
+                className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+              >
+                Mark All as Read
+              </button>
+            </div>
+          )}
+        </div>
+      </>
+  );
+}
 
 export default App;
 

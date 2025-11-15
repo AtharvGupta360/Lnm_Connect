@@ -21,6 +21,7 @@ public class SpaceDTO {
     private String creatorId;
     private String creatorName;
     private List<String> moderatorIds;
+    private List<String> memberIds;
     private List<String> rules;
     private List<String> tags;
     private Integer threadCount;

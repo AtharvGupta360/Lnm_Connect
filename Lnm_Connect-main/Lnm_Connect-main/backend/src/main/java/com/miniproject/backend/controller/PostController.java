@@ -179,5 +179,22 @@ public class PostController {
                 })
                 .collect(java.util.stream.Collectors.toList());
     }
+
+    /**
+     * Delete a post (author only)
+     * DELETE /api/posts/{postId}?userId=xxx
+     */
+    @DeleteMapping("/{postId}")
+    public void deletePost(@PathVariable String postId, @RequestParam String userId) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new RuntimeException("Post not found"));
+        
+        // Check if user is the author
+        if (!post.getAuthorId().equals(userId)) {
+            throw new RuntimeException("Only the author can delete this post");
+        }
+        
+        postRepository.delete(post);
+    }
 }
 

@@ -81,5 +81,89 @@ export const threadService = {
       params: { userId }
     });
     return response.data;
+  },
+
+  /**
+   * Vote on a thread (value: 1 for upvote, -1 for downvote)
+   */
+  voteThread: async (userId, threadId, value) => {
+    const response = await axios.post(`${API_BASE_URL}/threads/${threadId}/vote`, {
+      userId,
+      value
+    });
+    return response.data;
+  },
+
+  /**
+   * Get user's vote on a thread
+   */
+  getUserVoteOnThread: async (userId, threadId) => {
+    const response = await axios.get(`${API_BASE_URL}/threads/${threadId}/vote`, {
+      params: { userId }
+    });
+    return response.data.userVote;
+  },
+
+  /**
+   * Add a comment to a thread
+   */
+  addComment: async (userId, threadId, content, parentCommentId = null) => {
+    const response = await axios.post(`${API_BASE_URL}/threads/${threadId}/comments`, {
+      userId,
+      content,
+      parentCommentId
+    });
+    return response.data;
+  },
+
+  /**
+   * Get all comments for a thread
+   */
+  getComments: async (threadId, userId) => {
+    const response = await axios.get(`${API_BASE_URL}/threads/${threadId}/comments`, {
+      params: { userId }
+    });
+    return response.data;
+  },
+
+  /**
+   * Update a comment
+   */
+  updateComment: async (commentId, userId, content) => {
+    const response = await axios.put(`${API_BASE_URL}/comments/${commentId}`, {
+      userId,
+      content
+    });
+    return response.data;
+  },
+
+  /**
+   * Delete a comment
+   */
+  deleteComment: async (commentId, userId) => {
+    await axios.delete(`${API_BASE_URL}/comments/${commentId}`, {
+      params: { userId }
+    });
+  },
+
+  /**
+   * Vote on a comment (value: 1 for upvote, -1 for downvote)
+   */
+  voteComment: async (userId, commentId, value) => {
+    const response = await axios.post(`${API_BASE_URL}/comments/${commentId}/vote`, {
+      userId,
+      value
+    });
+    return response.data;
+  },
+
+  /**
+   * Get user's vote on a comment
+   */
+  getUserVoteOnComment: async (userId, commentId) => {
+    const response = await axios.get(`${API_BASE_URL}/comments/${commentId}/vote`, {
+      params: { userId }
+    });
+    return response.data.userVote;
   }
 };

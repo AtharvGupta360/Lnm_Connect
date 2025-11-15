@@ -68,6 +68,37 @@ export const spaceService = {
   getUserSpaces: async (userId) => {
     const response = await axios.get(`${API_BASE_URL}/spaces/user/${userId}`);
     return response.data;
+  },
+
+  /**
+   * Delete a space (creator only)
+   */
+  deleteSpace: async (spaceId, userId) => {
+    const response = await axios.delete(`${API_BASE_URL}/spaces/${spaceId}`, {
+      params: { userId }
+    });
+    return response.data;
+  },
+
+  /**
+   * Add a moderator to a space
+   */
+  addModerator: async (spaceId, userId, moderatorId) => {
+    const response = await axios.post(`${API_BASE_URL}/spaces/${spaceId}/moderators`, {
+      userId,
+      moderatorId
+    });
+    return response.data;
+  },
+
+  /**
+   * Remove a moderator from a space
+   */
+  removeModerator: async (spaceId, userId, moderatorId) => {
+    const response = await axios.delete(`${API_BASE_URL}/spaces/${spaceId}/moderators/${moderatorId}`, {
+      params: { userId }
+    });
+    return response.data;
   }
 };
 

@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { api, getCurrentUser } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
+import UserTagInput from './UserTagInput';
+import { tagService } from '../services/tagService';
 
 const POST_TAGS = [
   "Hackathon", "Internship", "Placement", "Gig/Freelance Work", "Workshop",
@@ -30,6 +32,7 @@ const CreatePostCard = ({ username, onPostCreated }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [mentionedUsers, setMentionedUsers] = useState([]); // Store tagged users
   const toast = useToast();
 
   const handleSubmit = async (e) => {
@@ -52,7 +55,7 @@ const CreatePostCard = ({ username, onPostCreated }) => {
         deadlineTimestamp = new Date(applicationDeadline).getTime();
       }
       
-      await api.createPost({
+      const newPost = await api.createPost({
         title: postTitle,
         tags: postTags,
         body: postBody,
@@ -65,6 +68,37 @@ const CreatePostCard = ({ username, onPostCreated }) => {
         applicationDeadline: deadlineTimestamp
       });
 
+      console.log('Post created - Full response:', newPost);
+      console.log('Post data:', newPost.data);
+      
+      // The axios response has the post in newPost.data
+      const postId = newPost.data?.id;
+      console.log('Post ID:', postId);
+      console.log('Mentioned users:', mentionedUsers);
+      console.log('Mentioned users length:', mentionedUsers.length);
+
+      // Create tags for mentioned users
+      if (mentionedUsers.length > 0 && postId) {
+        console.log('Creating tags for mentioned users:', mentionedUsers);
+        const taggedUserIds = mentionedUsers.map(user => user.userId);
+        console.log('Tagged user IDs:', taggedUserIds);
+        try {
+          await tagService.createTags(
+            user?.id,
+            taggedUserIds,
+            postId,
+            'post',
+            `${postTitle} - ${postBody.substring(0, 200)}`
+          );
+          console.log('Tags created successfully!');
+        } catch (tagError) {
+          console.error('Error creating tags:', tagError);
+          // Don't fail post creation if tags fail
+        }
+      } else {
+        console.log('Not creating tags. mentionedUsers.length:', mentionedUsers.length, 'postId:', postId);
+      }
+
       setSuccess('Post created successfully! 🎉');
       toast.success('Post created successfully!');
       
@@ -76,6 +110,7 @@ const CreatePostCard = ({ username, onPostCreated }) => {
         setPostImage('');
         setPostApplyEnabled(false);
         setApplicationDeadline('');
+        setMentionedUsers([]);
         setShowModal(false);
         setSuccess('');
         if (onPostCreated) onPostCreated();
@@ -222,15 +257,14 @@ const CreatePostCard = ({ username, onPostCreated }) => {
                   />
                 </div>
 
-                {/* Body */}
+                {/* Body with User Tagging */}
                 <div className="mb-4">
-                  <textarea
+                  <UserTagInput
                     value={postBody}
-                    onChange={(e) => setPostBody(e.target.value)}
-                    placeholder="What do you want to share? (Share opportunities, achievements, or start discussions...)"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all resize-none"
-                    rows="6"
-                    required
+                    onChange={setPostBody}
+                    placeholder="What do you want to share? Use @ to tag users..."
+                    minRows={6}
+                    onTagsChange={setMentionedUsers}
                   />
                 </div>
 

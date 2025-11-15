@@ -97,4 +97,55 @@ public class SpaceController {
         List<SpaceDTO> spaces = spaceService.getUserSpaces(userId);
         return ResponseEntity.ok(spaces);
     }
+
+    /**
+     * Delete a space (creator only)
+     * DELETE /api/spaces/{id}?userId=xxx
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteSpace(@PathVariable String id, @RequestParam String userId) {
+        spaceService.deleteSpace(id, userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Add a moderator to a space
+     * POST /api/spaces/{id}/moderators
+     */
+    @PostMapping("/{id}/moderators")
+    public ResponseEntity<SpaceDTO> addModerator(
+            @PathVariable String id,
+            @RequestBody Map<String, String> request) {
+        String userId = request.get("userId");
+        String newModeratorId = request.get("moderatorId");
+        
+        if (newModeratorId == null || newModeratorId.trim().isEmpty()) {
+            throw new RuntimeException("Moderator ID is required");
+        }
+        
+        SpaceDTO space = spaceService.addModerator(id, userId, newModeratorId);
+        return ResponseEntity.ok(space);
+    }
+
+    /**
+     * Remove a moderator from a space
+     * DELETE /api/spaces/{id}/moderators/{moderatorId}?userId=xxx
+     */
+    @DeleteMapping("/{id}/moderators/{moderatorId}")
+    public ResponseEntity<SpaceDTO> removeModerator(
+            @PathVariable String id,
+            @PathVariable String moderatorId,
+            @RequestParam String userId) {
+        SpaceDTO space = spaceService.removeModerator(id, userId, moderatorId);
+        return ResponseEntity.ok(space);
+    }
+
+    /**
+     * Get all members of a space
+     * GET /api/spaces/{id}/members
+     */
+    @GetMapping("/{id}/members")
+    public ResponseEntity<?> getSpaceMembers(@PathVariable String id) {
+        return ResponseEntity.ok(spaceService.getSpaceMembers(id));
+    }
 }
