@@ -44,7 +44,7 @@ const ProfileSidebar = ({ username, posts = [] }) => {
     <motion.div
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="sticky top-20 space-y-4"
+      className="sticky top-20 h-[calc(100vh-5rem)] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 space-y-4 pr-2"
     >
       {/* Profile Card */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">

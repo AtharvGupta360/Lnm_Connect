@@ -136,7 +136,7 @@ const SearchBar = ({ isCompact = false }) => {
   const renderResults = () => {
     if (!results || results.totalResults === 0) {
       return (
-        <div className="px-4 py-8 text-center text-gray-500">
+        <div className="px-6 py-8 text-center text-gray-500">
           <Search className="w-12 h-12 mx-auto mb-2 text-gray-300" />
           <p>No results found for "{query}"</p>
         </div>
@@ -157,7 +157,7 @@ const SearchBar = ({ isCompact = false }) => {
           return (
             <div key={key} className="border-b border-gray-100 last:border-0">
               {/* Category Header */}
-              <div className="px-4 py-2.5 bg-gray-50/80 backdrop-blur-sm sticky top-0 z-10">
+              <div className="px-6 py-3 bg-gray-50/80 backdrop-blur-sm sticky top-0 z-10">
                 <div className="flex items-center space-x-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                   {getCategoryIcon(icon)}
                   <span>{getCategoryLabel(icon)}</span>
@@ -171,56 +171,56 @@ const SearchBar = ({ isCompact = false }) => {
                   initial={{ opacity: 0, y: -5 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.03 }}
-                  className="px-4 py-3.5 hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors group"
+                  className="px-6 py-4 hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors group"
                   onClick={() => handleResultClick(result)}
                 >
-                  <div className="flex items-start space-x-3">
+                  <div className="flex items-start space-x-4">
                     {/* Avatar/Image */}
                     {result.imageUrl && (
                       <div className="flex-shrink-0">
                         <img
                           src={result.imageUrl}
                           alt={result.title}
-                          className="w-12 h-12 rounded-full object-cover ring-2 ring-gray-100 group-hover:ring-indigo-100 transition-all"
+                          className="w-14 h-14 rounded-full object-cover ring-2 ring-gray-100 group-hover:ring-indigo-100 transition-all"
                         />
                       </div>
                     )}
                     
                     {/* Content */}
-                    <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex-1 min-w-0 space-y-1.5">
                       {/* Title */}
-                      <div className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
+                      <div className="font-semibold text-base text-gray-900 group-hover:text-indigo-600 transition-colors">
                         {result.title}
                       </div>
                       
                       {/* Subtitle */}
                       {result.subtitle && (
-                        <div className="text-sm text-gray-600 line-clamp-1">
+                        <div className="text-sm text-gray-600">
                           {result.subtitle}
                         </div>
                       )}
                       
                       {/* Snippet */}
                       {result.snippet && (
-                        <div className="text-xs text-gray-500 line-clamp-2 leading-relaxed">
+                        <div className="text-sm text-gray-500 leading-relaxed">
                           {result.snippet}
                         </div>
                       )}
                       
                       {/* Tags */}
                       {result.tags && result.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 pt-1">
+                        <div className="flex flex-wrap gap-2 pt-1">
                           {result.tags.slice(0, 3).map((tag, tagIdx) => (
                             <span
                               key={tagIdx}
-                              className="inline-flex items-center text-xs px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md font-medium"
+                              className="inline-flex items-center text-xs px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-md font-medium whitespace-nowrap"
                             >
-                              <Hash className="w-3 h-3 mr-0.5" />
+                              <Hash className="w-3 h-3 mr-1" />
                               {tag}
                             </span>
                           ))}
                           {result.tags.length > 3 && (
-                            <span className="text-xs text-gray-400 px-1 py-0.5">
+                            <span className="text-xs text-gray-400 px-2 py-1">
                               +{result.tags.length - 3} more
                             </span>
                           )}
@@ -235,10 +235,10 @@ const SearchBar = ({ isCompact = false }) => {
         })}
         
         {/* View All Footer */}
-        <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-indigo-50/30 border-t border-gray-100 sticky bottom-0">
+        <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-indigo-50/30 border-t border-gray-100 sticky bottom-0">
           <button
             onClick={handleSearch}
-            className="w-full text-center text-sm font-semibold text-indigo-600 hover:text-indigo-700 hover:underline transition-all flex items-center justify-center space-x-2 py-1"
+            className="w-full text-center text-sm font-semibold text-indigo-600 hover:text-indigo-700 hover:underline transition-all flex items-center justify-center space-x-2 py-1.5"
           >
             <span>View all results for "{query}"</span>
             <TrendingUp className="w-4 h-4" />
@@ -264,13 +264,14 @@ const SearchBar = ({ isCompact = false }) => {
             onFocus={() => query.length >= 2 && results && setIsOpen(true)}
             onKeyDown={handleKeyDown}
             placeholder="Search skills, people, projects..."
-            className="w-full pl-12 pr-24 py-3.5 text-[15px] border-2 border-gray-200 rounded-xl 
-                     bg-gray-50/50 backdrop-blur-sm
-                     focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-50 
-                     hover:border-gray-300 hover:bg-white
+            className="w-full pl-12 pr-24 py-4 text-lg font-semibold border-2 border-gray-300 rounded-xl 
+                     bg-white
+                     focus:border-indigo-600 focus:bg-white focus:ring-4 focus:ring-indigo-200 
+                     hover:border-gray-400
                      transition-all duration-200 outline-none 
-                     placeholder:text-gray-400 text-gray-900
-                     shadow-sm hover:shadow"
+                     placeholder:text-gray-400
+                     shadow-md hover:shadow-lg"
+            style={{ color: '#000000', fontWeight: '600' }}
             aria-label="Search"
             aria-autocomplete="list"
             aria-controls="search-results"
@@ -311,17 +312,21 @@ const SearchBar = ({ isCompact = false }) => {
             transition={{ duration: 0.15, ease: "easeOut" }}
             id="search-results"
             role="listbox"
-            className="absolute top-full left-0 right-0 mt-2 
+            className="absolute top-full left-0 mt-2 
                      bg-white rounded-xl 
                      shadow-2xl shadow-indigo-100/50
                      border border-gray-200/80
                      overflow-hidden
                      z-[9999]
-                     max-h-[400px] overflow-y-auto
+                     max-h-[70vh] min-h-[300px] overflow-y-auto
                      scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent
-                     hover:scrollbar-thumb-gray-400"
+                     hover:scrollbar-thumb-gray-400
+                     resize"
             style={{
               backdropFilter: 'blur(10px)',
+              minWidth: 'max(500px, 100%)',
+              width: 'max-content',
+              maxWidth: '800px',
             }}
           >
             {renderResults()}

@@ -73,119 +73,108 @@ const HeaderNav = ({ username, handleLogout }) => {
   ];
 
   return (
-    <motion.header 
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      className="bg-white/80 backdrop-blur-md shadow-lg border-b border-gray-200 sticky top-0 z-50"
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center gap-4 h-16">
-          {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2 group flex-shrink-0">
+    <motion.header
+  initial={{ y: -100 }}
+  animate={{ y: 0 }}
+  className="bg-white/80 backdrop-blur-md shadow-lg border-b border-gray-200 sticky top-0 z-50"
+>
+  <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="flex items-center gap-3 h-16">
+      {/* Logo - Compact */}
+      <Link to="/" className="flex items-center space-x-2 group flex-shrink-0">
+        <motion.div whileHover={{ rotate: 360 }} transition={{ duration: 0.5 }}>
+          <Sparkles className="w-7 h-7 text-indigo-600" />
+        </motion.div>
+        <span className="text-lg font-extrabold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent hidden sm:inline whitespace-nowrap">
+          LNMConnect
+        </span>
+      </Link>
+
+   {/* Search Bar - Maximum Width */}
+<div className="hidden md:flex flex-1 min-w-0">
+  <SearchBar />
+</div>
+
+
+      {/* Navigation Links - Compact */}
+      <nav className="hidden lg:flex items-center space-x-1 flex-shrink-0">
+        {navLinks.map(({ path, label, icon: Icon, badge }) => (
+          <Link key={path} to={path} className="relative group">
             <motion.div
-              whileHover={{ rotate: 360 }}
-              transition={{ duration: 0.5 }}
-            >
-              <Sparkles className="w-8 h-8 text-indigo-600" />
-            </motion.div>
-            <span className="text-xl md:text-2xl font-extrabold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent hidden sm:inline">
-              LNMConnect
-            </span>
-          </Link>
-
-          {/* Search Bar - Desktop: Centered & Prominent (45-55% width) */}
-          <div className="hidden md:flex flex-1 justify-center px-4 lg:px-8 max-w-3xl mx-auto">
-            <div className="w-full">
-              <SearchBar />
-            </div>
-          </div>
-
-          {/* Navigation Links */}
-          <nav className="hidden lg:flex items-center space-x-1 flex-shrink-0">
-            {navLinks.map(({ path, label, icon: Icon, badge }) => (
-              <Link
-                key={path}
-                to={path}
-                className="relative group"
-              >
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 ${
-                    isActive(path)
-                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-indigo-600'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span className="font-semibold text-sm">{label}</span>
-                  {badge > 0 && (
-                    <motion.span
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg"
-                    >
-                      {badge > 9 ? '9+' : badge}
-                    </motion.span>
-                  )}
-                </motion.div>
-                {isActive(path) && (
-                  <motion.div
-                    layoutId="activeTab"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-600 to-purple-600"
-                    initial={false}
-                  />
-                )}
-              </Link>
-            ))}
-          </nav>
-
-          {/* User Info & Logout */}
-          <div className="flex items-center space-x-2 flex-shrink-0">
-            <div className="hidden lg:flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-full border border-indigo-200">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-sm font-medium text-gray-700">
-                {username}
-              </span>
-            </div>
-            <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={handleLogout}
-              className="flex items-center space-x-2 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold shadow-md transition-all duration-200"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Logout</span>
-            </motion.button>
-          </div>
-        </div>
-
-        {/* Search Bar - Mobile */}
-        <div className="md:hidden pb-3">
-          <SearchBar isCompact />
-        </div>
-      </div>
-
-      {/* Mobile Navigation */}
-      <div className="lg:hidden border-t border-gray-200 bg-white">
-        <nav className="flex justify-around py-2">
-          {navLinks.map(({ path, label, icon: Icon }) => (
-            <Link
-              key={path}
-              to={path}
-              className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors ${
+              className={`flex items-center space-x-1.5 px-2.5 py-2 rounded-lg transition-all duration-200 ${
                 isActive(path)
-                  ? 'text-indigo-600'
-                  : 'text-gray-600 hover:text-indigo-600'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-indigo-600'
               }`}
             >
-              <Icon className="w-5 h-5" />
-              <span className="text-xs font-medium">{label}</span>
-            </Link>
-          ))}
-        </nav>
+              <Icon className="w-4 h-4" />
+              <span className="font-semibold text-xs">{label}</span>
+              {badge > 0 && (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg"
+                >
+                  {badge > 9 ? '9+' : badge}
+                </motion.span>
+              )}
+            </motion.div>
+            {isActive(path) && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-600 to-purple-600"
+                initial={false}
+              />
+            )}
+          </Link>
+        ))}
+      </nav>
+
+      {/* User Info & Logout - Compact */}
+      <div className="flex items-center space-x-2 flex-shrink-0">
+        <div className="hidden lg:flex items-center space-x-2 px-2.5 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-full border border-indigo-200">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+          <span className="text-xs font-medium text-gray-700 max-w-[80px] truncate">{username}</span>
+        </div>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={handleLogout}
+          className="flex items-center space-x-1.5 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-2.5 py-2 rounded-lg text-xs font-semibold shadow-md transition-all duration-200"
+        >
+          <LogOut className="w-4 h-4" />
+          <span className="hidden sm:inline">Logout</span>
+        </motion.button>
       </div>
-    </motion.header>
+    </div>
+
+    {/* Search Bar - Mobile */}
+    <div className="md:hidden pb-3 px-4">
+      <SearchBar isCompact />
+    </div>
+  </div>
+
+  {/* Mobile Navigation */}
+  <div className="lg:hidden border-t border-gray-200 bg-white">
+    <nav className="flex justify-around py-2">
+      {navLinks.map(({ path, label, icon: Icon }) => (
+        <Link
+          key={path}
+          to={path}
+          className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors ${
+            isActive(path) ? 'text-indigo-600' : 'text-gray-600 hover:text-indigo-600'
+          }`}
+        >
+          <Icon className="w-5 h-5" />
+          <span className="text-xs font-medium">{label}</span>
+        </Link>
+      ))}
+    </nav>
+  </div>
+</motion.header>
+
   );
 };
 
