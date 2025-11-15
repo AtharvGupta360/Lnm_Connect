@@ -74,7 +74,9 @@ public class PostController {
             @RequestParam(value = "author", required = false) String author,
             @RequestParam(value = "from", required = false) Long from,
             @RequestParam(value = "to", required = false) Long to,
-            @RequestParam(value = "currentUserId", required = false) String currentUserId
+            @RequestParam(value = "currentUserId", required = false) String currentUserId,
+            @RequestParam(value = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(value = "limit", required = false, defaultValue = "20") int limit
     ) {
         List<Post> posts = postRepository.findAll();
         // Filter by tag
@@ -103,8 +105,13 @@ public class PostController {
         } else { // default or "recent"
             posts.sort((a, b) -> Long.compare(b.getCreatedAt(), a.getCreatedAt()));
         }
+        // Apply pagination
+        int start = page * limit;
+        int end = Math.min(start + limit, posts.size());
+        List<Post> paginatedPosts = start < posts.size() ? posts.subList(start, end) : new ArrayList<>();
+        
         List<PostResponseDTO> result = new ArrayList<>();
-        for (Post post : posts) {
+        for (Post post : paginatedPosts) {
             result.add(applicationService.getPostWithApplyInfo(post, currentUserId));
         }
         return result;

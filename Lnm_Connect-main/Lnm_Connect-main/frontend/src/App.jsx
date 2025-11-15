@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, Loader2, Users, X, Eye, MessageCircle, Home, UserCircle, Mail, LogOut, Sparkles, UserCheck, Bell, MessageSquare, Trash2, Reply, FileText } from "lucide-react";
 import SignupDetails from "./SignupDetails";
@@ -344,7 +344,7 @@ const App = () => {
   }
 
   // Fetch posts function
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     if (!isLoggedIn) return;
     setIsLoadingPosts(true);
     try {
@@ -433,7 +433,7 @@ const App = () => {
     } finally {
       setIsLoadingPosts(false);
     }
-  };
+  }, [isLoggedIn, filterTag, sortOption, username]);
 
   useEffect(() => {
     const storedIsLoggedIn = localStorage.getItem("isLoggedIn");
@@ -839,6 +839,8 @@ const App = () => {
                                   src={post.image}
                                   alt="Post content"
                                   className="w-full h-auto object-cover rounded-xl"
+                                  loading="lazy"
+                                  decoding="async"
                                 />
                               </div>
                             )}
