@@ -12,12 +12,15 @@ import SpacesPage from "./pages/SpacesPage";
 import SpaceDetailPage from "./pages/SpaceDetailPage";
 import ThreadDetailPage from "./pages/ThreadDetailPage";
 import RecommendationsPage from "./pages/RecommendationsPage";
+import NotificationsPage from "./pages/NotificationsPage";
 import SearchBar from "./components/SearchBar";
 import ProfileSidebar from "./components/ProfileSidebar";
 import DiscoverySidebar from "./components/DiscoverySidebar";
 import CreatePostCard from "./components/CreatePostCard";
+import NotificationDropdown from "./components/NotificationDropdown";
 import { PostSkeleton } from "./components/SkeletonLoaders";
 import { ToastProvider } from "./contexts/ToastContext";
+import { NotificationProvider } from "./contexts/NotificationContext";
 import { followService } from "./services/followService";
 import ChatBot from "./components/ChatBot";
 import AdminUnanswered from "./pages/AdminUnanswered";
@@ -157,6 +160,9 @@ const HeaderNav = ({ username, handleLogout, onOpenTagsModal }) => {
 
       {/* User Info & Logout - Compact */}
       <div className="flex items-center space-x-2 flex-shrink-0">
+        {/* Notification Bell */}
+        <NotificationDropdown />
+        
         <div className="hidden lg:flex items-center space-x-2 px-2.5 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-full border border-indigo-200">
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
           <span className="text-xs font-medium text-gray-700 max-w-[80px] truncate">{username}</span>
@@ -202,28 +208,90 @@ const HeaderNav = ({ username, handleLogout, onOpenTagsModal }) => {
 };
 
 // HomeContent Component - wraps homepage content with scroll-to-post functionality
-const HomeContent = ({ children, posts, postRefs, highlightedPost, setHighlightedPost }) => {
+const HomeContent = ({ children, posts, setPosts, postRefs, highlightedPost, setHighlightedPost }) => {
   const [searchParams] = useSearchParams();
+  const getUserId = () => localStorage.getItem('userId') || '';
 
   // Scroll to post when postId is in URL
   useEffect(() => {
     const postId = searchParams.get('postId');
     if (postId && posts.length > 0) {
       console.log('Scrolling to post:', postId);
+      console.log('Available post IDs:', posts.map(p => p.id));
+      console.log('Post exists in array?', posts.some(p => p.id === postId));
+      
+      // Check if the post exists in the posts array
+      const postExists = posts.some(p => p.id === postId);
+      if (!postExists) {
+        console.warn('Post not found in posts array, fetching it:', postId);
+        
+        // Fetch the specific post and add it to the posts array
+        fetch(`${API_URL}/${postId}?userId=${getUserId()}`)
+          .then(res => {
+            if (!res.ok) throw new Error('Post not found');
+            return res.json();
+          })
+          .then(post => {
+            if (post && post.id) {
+              console.log('Fetched post successfully:', post.title);
+              // Add the post to the beginning of posts array
+              setPosts(prevPosts => [post, ...prevPosts.filter(p => p.id !== post.id)]);
+              
+              // Set highlighted
+              setHighlightedPost(postId);
+              
+              // Try to scroll after the post is rendered
+              setTimeout(() => {
+                const element = postRefs.current[postId];
+                if (element) {
+                  element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                  console.warn('Element still not found after fetch');
+                }
+              }, 500);
+            }
+          })
+          .catch(err => {
+            console.error('Error fetching post:', err);
+            alert('Post not found or has been deleted.');
+          });
+        
+        return;
+      }
+      
       // Set highlighted post
       setHighlightedPost(postId);
       
-      // Wait a bit for posts to render
-      const timer = setTimeout(() => {
+      // Try to scroll with retries in case the post isn't rendered yet
+      let attempts = 0;
+      const maxAttempts = 10;
+      
+      const tryScroll = () => {
         const element = postRefs.current[postId];
-        console.log('Found element:', element);
+        console.log(`Attempt ${attempts + 1}: Found element:`, element);
+        console.log('Available refs:', Object.keys(postRefs.current));
+        
         if (element) {
           element.scrollIntoView({ 
             behavior: 'smooth', 
             block: 'center' 
           });
+          return true;
         }
-      }, 300);
+        
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(tryScroll, 200);
+        } else {
+          console.warn('Could not find post element after', maxAttempts, 'attempts');
+          console.warn('Post ID:', postId);
+          console.warn('Available refs:', Object.keys(postRefs.current));
+        }
+        return false;
+      };
+      
+      // Start trying to scroll after a short delay
+      const timer = setTimeout(tryScroll, 100);
       
       // Clear highlight after 3 seconds
       const highlightTimer = setTimeout(() => {
@@ -687,14 +755,15 @@ const App = () => {
 
   return (
     <ToastProvider>
-      <Router>
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-          {/* Enhanced Header */}
-          <HeaderNav username={username} handleLogout={handleLogout} onOpenTagsModal={() => setShowTagsModal(true)} />
+      <NotificationProvider>
+        <Router>
+          <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+            {/* Enhanced Header */}
+            <HeaderNav username={username} handleLogout={handleLogout} onOpenTagsModal={() => setShowTagsModal(true)} />
 
         <Routes>
           <Route path="/" element={
-            <HomeContent posts={posts} postRefs={postRefs} highlightedPost={highlightedPost} setHighlightedPost={setHighlightedPost}>
+            <HomeContent posts={posts} setPosts={setPosts} postRefs={postRefs} highlightedPost={highlightedPost} setHighlightedPost={setHighlightedPost}>
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                   {/* Left Sidebar - Profile (3 columns) */}
@@ -910,6 +979,14 @@ const App = () => {
                                   type="text"
                                   value={post.commentInput || ""}
                                   onChange={e => setPosts(posts => posts.map(p => p.id === post.id ? { ...p, commentInput: e.target.value } : p))}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                      e.preventDefault();
+                                      if (post.commentInput && post.commentInput.trim()) {
+                                        handleAddComment(post.id);
+                                      }
+                                    }
+                                  }}
                                   className="flex-1 px-4 py-2 border border-gray-300 rounded-full text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all hover:border-indigo-300 bg-gray-50"
                                   placeholder="Add a comment..."
                                 />
@@ -950,6 +1027,7 @@ const App = () => {
           <Route path="/profile" element={<ProfilePage currentUser={getCurrentUser()} />} />
           <Route path="/profile/:userId" element={<ProfilePage currentUser={getCurrentUser()} />} />
           <Route path="/chat" element={<ChatPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/admin/unanswered" element={<AdminUnanswered />} />
         </Routes>
 
@@ -1031,6 +1109,7 @@ const App = () => {
         </AnimatePresence>
       </div>
     </Router>
+    </NotificationProvider>
     </ToastProvider>
   );
 };

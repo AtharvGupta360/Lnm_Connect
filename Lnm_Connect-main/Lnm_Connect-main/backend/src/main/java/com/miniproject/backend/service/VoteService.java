@@ -3,9 +3,11 @@ package com.miniproject.backend.service;
 import com.miniproject.backend.model.Thread;
 import com.miniproject.backend.model.ThreadComment;
 import com.miniproject.backend.model.Vote;
+import com.miniproject.backend.model.User;
 import com.miniproject.backend.repository.ThreadCommentRepository;
 import com.miniproject.backend.repository.ThreadRepository;
 import com.miniproject.backend.repository.VoteRepository;
+import com.miniproject.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +25,8 @@ public class VoteService {
     private final VoteRepository voteRepository;
     private final ThreadRepository threadRepository;
     private final ThreadCommentRepository commentRepository;
+    private final UserRepository userRepository;
+    private final NotificationService notificationService;
     
     /**
      * Vote on a thread (upvote = 1, downvote = -1)
@@ -83,7 +87,22 @@ public class VoteService {
         thread.setVoteScore(thread.getUpvotes() - thread.getDownvotes());
         
         threadRepository.save(thread);
-        return voteRepository.save(vote);
+        Vote savedVote = voteRepository.save(vote);
+        
+        // Create notification for upvote only (not downvote)
+        if (value == 1 && !userId.equals(thread.getAuthorId())) {
+            userRepository.findById(userId).ifPresent(voter -> {
+                notificationService.createUpvoteNotification(
+                    thread.getAuthorId(),
+                    userId,
+                    voter.getName(),
+                    threadId,
+                    "thread"
+                );
+            });
+        }
+        
+        return savedVote;
     }
     
     /**
@@ -145,7 +164,22 @@ public class VoteService {
         comment.setVoteScore(comment.getUpvotes() - comment.getDownvotes());
         
         commentRepository.save(comment);
-        return voteRepository.save(vote);
+        Vote savedVote = voteRepository.save(vote);
+        
+        // Create notification for upvote only (not downvote)
+        if (value == 1 && !userId.equals(comment.getAuthorId())) {
+            userRepository.findById(userId).ifPresent(voter -> {
+                notificationService.createUpvoteNotification(
+                    comment.getAuthorId(),
+                    userId,
+                    voter.getName(),
+                    commentId,
+                    "comment"
+                );
+            });
+        }
+        
+        return savedVote;
     }
     
     /**

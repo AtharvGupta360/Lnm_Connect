@@ -7,12 +7,15 @@ import com.miniproject.backend.model.User;
 import com.miniproject.backend.repository.ThreadCommentRepository;
 import com.miniproject.backend.repository.ThreadRepository;
 import com.miniproject.backend.repository.UserRepository;
+import com.miniproject.backend.event.UserTaggedEvent;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -26,6 +29,8 @@ public class ThreadCommentService {
     private final ThreadRepository threadRepository;
     private final UserRepository userRepository;
     private final VoteService voteService;
+    private final NotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
     
     /**
      * Add a comment to a thread
@@ -74,6 +79,54 @@ public class ThreadCommentService {
         // Update thread's comment count
         thread.setCommentCount(thread.getCommentCount() + 1);
         threadRepository.save(thread);
+        
+        // Create notifications
+        if (parentCommentId != null && !parentCommentId.isEmpty()) {
+            // Reply to a comment - notify parent comment author
+            ThreadComment parentComment = commentRepository.findById(parentCommentId).orElse(null);
+            if (parentComment != null && !parentComment.getAuthorId().equals(userId)) {
+                notificationService.createCommentReplyNotification(
+                    parentComment.getAuthorId(),
+                    userId,
+                    user.getName(),
+                    parentCommentId,
+                    content,
+                    thread.getId()
+                );
+            }
+        } else {
+            // Top-level comment - notify thread author
+            if (!thread.getAuthorId().equals(userId)) {
+                notificationService.createThreadReplyNotification(
+                    thread.getAuthorId(),
+                    userId,
+                    user.getName(),
+                    threadId,
+                    content
+                );
+            }
+        }
+        
+        // Extract @mentions and publish events
+        Set<String> mentions = notificationService.extractMentions(content);
+        for (String mentionedName : mentions) {
+            userRepository.findByName(mentionedName).ifPresent(taggedUser -> {
+                if (!taggedUser.getId().equals(userId)) {
+                    String actionUrl = "/threads/" + threadId;
+                    eventPublisher.publishEvent(new UserTaggedEvent(
+                        this,
+                        taggedUser.getId(),
+                        taggedUser.getName(),
+                        userId,
+                        user.getName(),
+                        threadId,
+                        "thread",
+                        content,
+                        actionUrl
+                    ));
+                }
+            });
+        }
         
         // Convert to DTO
         return convertToDTO(savedComment, user, 0);

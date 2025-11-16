@@ -25,6 +25,9 @@ public class FollowService {
 
     @Autowired
     private UserRepository userRepository;
+    
+    @Autowired
+    private NotificationService notificationService;
 
     /**
      * Send follow/connect request
@@ -58,7 +61,18 @@ public class FollowService {
 
         // Create new follow (always PENDING for connection requests)
         Follow follow = new Follow(followerId, followingId, FollowStatus.PENDING);
-        return followRepository.save(follow);
+        Follow savedFollow = followRepository.save(follow);
+        
+        // Create FOLLOW_REQUEST notification
+        userRepository.findById(followerId).ifPresent(follower -> {
+            notificationService.createFollowRequestNotification(
+                followingId,
+                followerId,
+                follower.getName()
+            );
+        });
+        
+        return savedFollow;
     }
 
     /**
@@ -84,7 +98,18 @@ public class FollowService {
 
         follow.setStatus(FollowStatus.ACCEPTED);
         follow.setUpdatedAt(LocalDateTime.now());
-        return followRepository.save(follow);
+        Follow savedFollow = followRepository.save(follow);
+        
+        // Create NEW_FOLLOWER notification when request accepted
+        userRepository.findById(follow.getFollowerId()).ifPresent(follower -> {
+            notificationService.createFollowerNotification(
+                follow.getFollowingId(),
+                follow.getFollowerId(),
+                follower.getName()
+            );
+        });
+        
+        return savedFollow;
     }
 
     /**

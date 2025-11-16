@@ -63,11 +63,19 @@ const SearchResultsPage = () => {
         return results.projects || [];
       case 'all':
       default:
-        return [
+        // Combine all results and remove duplicates by ID
+        const allResults = [
           ...(results.profiles || []),
           ...(results.posts || []),
           ...(results.projects || [])
         ];
+        
+        // Remove duplicates based on ID
+        const uniqueResults = allResults.filter((result, index, self) =>
+          index === self.findIndex((r) => r.id === result.id)
+        );
+        
+        return uniqueResults;
     }
   };
 

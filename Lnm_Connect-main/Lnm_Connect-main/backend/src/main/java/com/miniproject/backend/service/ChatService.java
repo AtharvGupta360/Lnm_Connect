@@ -9,7 +9,9 @@ import com.miniproject.backend.model.User;
 import com.miniproject.backend.repository.ChatRoomRepository;
 import com.miniproject.backend.repository.MessageRepository;
 import com.miniproject.backend.repository.UserRepository;
+import com.miniproject.backend.event.MessageReceivedEvent;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,7 @@ public class ChatService {
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final ApplicationEventPublisher eventPublisher;
     
     /**
      * Get or create a chat room between two users
@@ -60,7 +63,7 @@ public class ChatService {
                 request.getContent()
         );
         message.setAttachmentUrl(request.getAttachmentUrl());
-        message = messageRepository.save(message);
+        final Message savedMessage = messageRepository.save(message);
         
         // Update chat room's last message time
         chatRoomRepository.findById(chatRoomId).ifPresent(chatRoom -> {
@@ -69,7 +72,7 @@ public class ChatService {
         });
         
         // Convert to DTO with user details
-        MessageDTO messageDTO = convertToMessageDTO(message);
+        MessageDTO messageDTO = convertToMessageDTO(savedMessage);
         
         // Send real-time notification via WebSocket
         messagingTemplate.convertAndSend(
@@ -83,6 +86,23 @@ public class ChatService {
                 "/queue/notifications",
                 messageDTO
         );
+        
+        // Publish MessageReceivedEvent for notification system
+        userRepository.findById(senderId).ifPresent(sender -> {
+            String messagePreview = request.getContent().length() > 50 
+                ? request.getContent().substring(0, 50) + "..." 
+                : request.getContent();
+                
+            eventPublisher.publishEvent(new MessageReceivedEvent(
+                this,
+                request.getReceiverId(),
+                senderId,
+                sender.getName(),
+                savedMessage.getId(),
+                messagePreview,
+                chatRoomId
+            ));
+        });
         
         return messageDTO;
     }

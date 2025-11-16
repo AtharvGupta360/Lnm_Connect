@@ -2,12 +2,17 @@ package com.miniproject.backend.controller;
 
 import com.miniproject.backend.model.Post;
 import com.miniproject.backend.repository.PostRepository;
+import com.miniproject.backend.repository.UserRepository;
 import com.miniproject.backend.dto.PostResponseDTO;
 import com.miniproject.backend.service.ApplicationService;
+import com.miniproject.backend.service.NotificationService;
+import com.miniproject.backend.event.UserTaggedEvent;
 import java.util.ArrayList;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/posts")
@@ -19,10 +24,24 @@ public class PostController {
         Post post = postRepository.findById(postId).orElse(null);
         if (post == null) return null;
         java.util.Set<String> likes = post.getLikes();
-        if (likes.contains(userId)) {
+        boolean wasLiked = likes.contains(userId);
+        
+        if (wasLiked) {
             likes.remove(userId); // Unlike
         } else {
             likes.add(userId); // Like
+            
+            // Create notification for post author (only on like, not unlike)
+            if (!userId.equals(post.getAuthorId())) {
+                userRepository.findById(userId).ifPresent(liker -> {
+                    notificationService.createLikeNotification(
+                        post.getAuthorId(),
+                        userId,
+                        liker.getName(),
+                        post.getId()
+                    );
+                });
+            }
         }
         post.setLikes(likes);
         return postRepository.save(post);
@@ -37,7 +56,44 @@ public class PostController {
         if (comments == null) comments = new java.util.ArrayList<>();
         comments.add(comment);
         post.setComments(comments);
-        return postRepository.save(post);
+        Post savedPost = postRepository.save(post);
+        
+        // Create comment notification for post author
+        if (!comment.getUserId().equals(post.getAuthorId())) {
+            notificationService.createCommentNotification(
+                post.getAuthorId(),
+                comment.getUserId(),
+                comment.getUserName(),
+                post.getId(),
+                comment.getText()
+            );
+        }
+        
+        // Extract @mentions from comment text and publish events
+        String commentText = comment.getText();
+        if (commentText != null) {
+            Set<String> mentions = notificationService.extractMentions(commentText);
+            for (String mentionedName : mentions) {
+                userRepository.findByName(mentionedName).ifPresent(taggedUser -> {
+                    if (!taggedUser.getId().equals(comment.getUserId())) {
+                        String actionUrl = "/?postId=" + post.getId();
+                        eventPublisher.publishEvent(new UserTaggedEvent(
+                            this,
+                            taggedUser.getId(),
+                            taggedUser.getName(),
+                            comment.getUserId(),
+                            comment.getUserName(),
+                            post.getId(),
+                            "comment",
+                            commentText,
+                            actionUrl
+                        ));
+                    }
+                });
+            }
+        }
+        
+        return savedPost;
     }
 
     // Get comments for a post
@@ -60,11 +116,45 @@ public class PostController {
     private PostRepository postRepository;
     @Autowired
     private ApplicationService applicationService;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private NotificationService notificationService;
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     @PostMapping
     public Post createPost(@RequestBody Post post) {
         post.setCreatedAt(System.currentTimeMillis());
-        return postRepository.save(post);
+        Post savedPost = postRepository.save(post);
+        
+        // Extract @mentions and publish events
+        String body = post.getBody();
+        if (body != null) {
+            Set<String> mentions = notificationService.extractMentions(body);
+            for (String mentionedName : mentions) {
+                // Find user by name
+                userRepository.findByName(mentionedName).ifPresent(taggedUser -> {
+                    if (!taggedUser.getId().equals(post.getAuthorId())) {
+                        // Publish UserTaggedEvent
+                        String actionUrl = "/post/" + savedPost.getId();
+                        eventPublisher.publishEvent(new UserTaggedEvent(
+                            this,
+                            taggedUser.getId(),
+                            taggedUser.getName(),
+                            post.getAuthorId(),
+                            post.getAuthorName(),
+                            savedPost.getId(),
+                            "post",
+                            body,
+                            actionUrl
+                        ));
+                    }
+                });
+            }
+        }
+        
+        return savedPost;
     }
 
     @GetMapping
@@ -120,6 +210,18 @@ public class PostController {
     @GetMapping("/user/{userId}")
     public List<Post> getPostsByUser(@PathVariable String userId) {
         return postRepository.findByAuthorId(userId);
+    }
+
+    // Get a single post by ID
+    @GetMapping("/{postId}")
+    public PostResponseDTO getPostById(@PathVariable String postId, @RequestParam(required = false) String userId) {
+        Post post = postRepository.findById(postId).orElse(null);
+        if (post == null) {
+            return null;
+        }
+        
+        String currentUserId = userId != null ? userId : "";
+        return applicationService.getPostWithApplyInfo(post, currentUserId);
     }
 
     /**
