@@ -187,12 +187,12 @@ const VoiceChannelModal = ({ channel, onClose, currentUserId, connections, stomp
       
       console.log('Existing participants to connect:', existingParticipants);
       
+      // First notify others that we joined (so they receive the broadcast)
+      webrtcService.notifyJoined();
+      
       if (existingParticipants.length > 0) {
         webrtcService.connectToParticipants(existingParticipants);
       }
-
-      // Notify others that we joined
-      webrtcService.notifyJoined();
 
       console.log('Voice channel initialized successfully');
     } catch (error) {

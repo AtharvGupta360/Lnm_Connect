@@ -118,6 +118,7 @@ class WebRTCService {
    * Notify other users that we joined the channel
    */
   notifyJoined() {
+    console.log(`📢 Broadcasting join notification to channel ${this.channelId}`);
     if (this.stompClient && this.stompClient.connected) {
       this.stompClient.publish({
         destination: `/app/voice-channel/${this.channelId}/user-joined`,
@@ -126,6 +127,9 @@ class WebRTCService {
           channelId: this.channelId,
         }),
       });
+      console.log(`✅ Join notification sent for user ${this.currentUserId}`);
+    } else {
+      console.error(`❌ Cannot send join notification - STOMP not connected`);
     }
   }
 
@@ -452,62 +456,15 @@ class WebRTCService {
 
   /**
    * Handle new user joining the channel
+   * When a new user joins, THEY will initiate connections with us
+   * We just need to wait for their offer
    */
   async handleUserJoined(userId) {
-    console.log(`👤 User ${userId} joined the channel`);
+    console.log(`👤 User ${userId} joined the channel (they will initiate connection with us)`);
     
-    // Check if we're already processing this user
-    if (this.processingUsers.has(userId)) {
-      console.log(`⏳ Already processing connection with ${userId}, skipping duplicate event`);
-      return;
-    }
-    
-    // Check if we already have a connection with this user
-    if (this.peers.has(userId)) {
-      console.log(`⚠️ Already have peer connection with ${userId}, skipping`);
-      return;
-    }
-    
-    // Check if we've already initiated with this user
-    if (this.initiatedConnections.has(userId)) {
-      console.log(`⚠️ Already initiated connection with ${userId}, skipping duplicate`);
-      return;
-    }
-    
-    // Mark as processing
-    this.processingUsers.add(userId);
-    
-    // Only create peer connection if we should be the initiator
-    // Use string comparison to determine who initiates (consistent across both clients)
-    const shouldInitiate = this.currentUserId < userId;
-    
-    console.log(`🤔 Should we initiate with ${userId}? ${shouldInitiate} (our ID: ${this.currentUserId})`);
-    
-    if (shouldInitiate) {
-      // Mark as initiated to prevent duplicates
-      this.initiatedConnections.add(userId);
-      
-      try {
-        // Create peer connection as initiator
-        await this.createPeerConnection(userId, true);
-        
-        if (this.onPeerJoinedCallback) {
-          this.onPeerJoinedCallback(userId);
-        }
-      } catch (error) {
-        console.error(`❌ Error handling user joined ${userId}:`, error);
-        // Remove from initiated on error so it can be retried
-        this.initiatedConnections.delete(userId);
-      } finally {
-        // Always remove from processing when done
-        this.processingUsers.delete(userId);
-      }
-    } else {
-      console.log(`⏸️ Waiting for ${userId} to initiate connection (they have lower ID)`);
-      this.processingUsers.delete(userId);
-      if (this.onPeerJoinedCallback) {
-        this.onPeerJoinedCallback(userId);
-      }
+    // Just add to UI, the new user will send us an offer
+    if (this.onPeerJoinedCallback) {
+      this.onPeerJoinedCallback(userId);
     }
   }
 
@@ -540,44 +497,46 @@ class WebRTCService {
 
   /**
    * Connect to existing participants in the channel
+   * New user joining initiates connections with all existing participants
    */
   async connectToParticipants(participantIds) {
-    console.log('Connecting to existing participants:', participantIds);
+    console.log('🚀 New user connecting to existing participants:', participantIds);
     
     if (!this.localStream) {
       console.error('Cannot connect to participants: No local stream');
       return;
     }
     
-    for (const userId of participantIds) {
-      if (userId !== this.currentUserId) {
-        // Check if we already have a connection
-        if (this.peers.has(userId)) {
-          console.log(`⚠️ Already have peer connection with ${userId}, skipping`);
-          continue;
-        }
-        
-        // Check if we've already initiated
-        if (this.initiatedConnections.has(userId)) {
-          console.log(`⚠️ Already initiated connection with ${userId}, skipping`);
-          continue;
-        }
-        
-        // Only initiate if our ID is lower (deterministic ordering)
-        const shouldInitiate = this.currentUserId < userId;
-        console.log(`🔌 Connecting to ${userId}, should initiate: ${shouldInitiate}`);
-        
-        if (shouldInitiate) {
+    // If there are existing participants, WE are the new user and must initiate
+    const shouldInitiate = participantIds.length > 0;
+    console.log(`Should initiate connections: ${shouldInitiate} (we are ${shouldInitiate ? 'NEW' : 'FIRST'} user)`);
+    
+    if (shouldInitiate) {
+      for (const userId of participantIds) {
+        if (userId !== this.currentUserId) {
+          // Check if we already have a connection
+          if (this.peers.has(userId)) {
+            console.log(`⚠️ Already have peer connection with ${userId}, skipping`);
+            continue;
+          }
+          
+          // Check if we've already initiated
+          if (this.initiatedConnections.has(userId)) {
+            console.log(`⚠️ Already initiated connection with ${userId}, skipping`);
+            continue;
+          }
+          
           // Mark as initiated
           this.initiatedConnections.add(userId);
+          
+          console.log(`📤 Initiating connection with existing participant ${userId}`);
           
           try {
             await this.createPeerConnection(userId, true);
           } catch (error) {
-            console.error(`Failed to create connection with ${userId}:`, error);
+            console.error(`❌ Failed to create connection with ${userId}:`, error);
+            this.initiatedConnections.delete(userId);
           }
-        } else {
-          console.log(`⏸️ Waiting for ${userId} to initiate (they have lower ID)`);
         }
       }
     }
