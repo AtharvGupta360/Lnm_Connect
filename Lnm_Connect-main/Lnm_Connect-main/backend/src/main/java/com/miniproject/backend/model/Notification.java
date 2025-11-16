@@ -54,7 +54,8 @@ public class Notification {
         THREAD_REPLY,
         COMMENT_REPLY,
         UPVOTE,
-        THREAD_MENTION
+        THREAD_MENTION,
+        VOICE_CHANNEL_INVITE
     }
     
     // Constructors

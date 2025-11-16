@@ -250,6 +250,7 @@ export const NotificationProvider = ({ children }) => {
     unreadCount,
     isConnected,
     loading,
+    stompClient: clientRef.current,
     fetchNotifications,
     fetchUnreadCount,
     markAsRead,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle, Loader2, Users, X, Eye, MessageCircle, Home, UserCircle, Mail, LogOut, Sparkles, UserCheck, Bell, MessageSquare, Trash2, Reply, FileText } from "lucide-react";
+import { CheckCircle, Loader2, Users, X, Eye, MessageCircle, Home, UserCircle, Mail, LogOut, Sparkles, UserCheck, Bell, MessageSquare, Trash2, Reply, FileText, Phone } from "lucide-react";
 import SignupDetails from "./SignupDetails";
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import ProfilePage from "./ProfilePage";
@@ -20,10 +20,13 @@ import CreatePostCard from "./components/CreatePostCard";
 import NotificationDropdown from "./components/NotificationDropdown";
 import { PostSkeleton } from "./components/SkeletonLoaders";
 import { ToastProvider } from "./contexts/ToastContext";
-import { NotificationProvider } from "./contexts/NotificationContext";
+import { NotificationProvider, useNotifications } from "./contexts/NotificationContext";
 import { followService } from "./services/followService";
 import ChatBot from "./components/ChatBot";
 import AdminUnanswered from "./pages/AdminUnanswered";
+import VoiceChannelModal from "./components/VoiceChannelModal";
+import VoiceChannelInvites from "./components/VoiceChannelInvites";
+import CreateVoiceChannelModal from "./components/CreateVoiceChannelModal";
 
 // Backend API URL
 const API_URL = "http://localhost:8080/api/posts";
@@ -308,7 +311,10 @@ const HomeContent = ({ children, posts, setPosts, postRefs, highlightedPost, set
   return children;
 };
 
-const App = () => {
+const AppContent = () => {
+  // Get WebSocket client from notification context
+  const { stompClient } = useNotifications();
+  
   // Sorting/filtering state
   const [sortOption, setSortOption] = useState("recent");
   const [filterTag, setFilterTag] = useState("");
@@ -345,6 +351,11 @@ const App = () => {
   
   // ChatBot state
   const [showChatBot, setShowChatBot] = useState(false);
+  
+  // Voice Channel state
+  const [activeVoiceChannel, setActiveVoiceChannel] = useState(null);
+  const [showCreateVoiceChannel, setShowCreateVoiceChannel] = useState(false);
+  const [userConnections, setUserConnections] = useState([]);
   const [chatBotPosition, setChatBotPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   
@@ -534,7 +545,7 @@ const App = () => {
       } catch {}
     }
     
-    if (isLoggedIn) {
+    if (storedIsLoggedIn === "true") {
       fetchAllUsers();
       fetchAllClubs();
     }
@@ -544,6 +555,41 @@ const App = () => {
   useEffect(() => {
     fetchPosts();
   }, [isLoggedIn, username, sortOption, filterTag]);
+
+  // Fetch connections when user logs in
+  useEffect(() => {
+    async function fetchUserConnections() {
+      try {
+        const currentUser = getCurrentUser();
+        console.log('Current user for connections:', currentUser);
+        if (currentUser && currentUser.id) {
+          console.log('Fetching connections for user:', currentUser.id);
+          const res = await followService.getConnections(currentUser.id);
+          console.log('Connections response:', res);
+          console.log('Connections response type:', typeof res, 'isArray:', Array.isArray(res));
+          
+          // Handle both array and object response formats
+          const connections = Array.isArray(res) ? res : (res.connections || []);
+          console.log('Processed connections:', connections);
+          console.log('Number of connections:', connections.length);
+          
+          setUserConnections(connections);
+        } else {
+          console.log('No current user or user ID not found');
+        }
+      } catch (err) {
+        console.error('Error fetching connections:', err);
+        console.error('Error details:', err.response?.data || err.message);
+        // Set empty array on error to prevent undefined issues
+        setUserConnections([]);
+      }
+    }
+    
+    if (isLoggedIn) {
+      console.log('User is logged in, fetching connections...');
+      fetchUserConnections();
+    }
+  }, [isLoggedIn]);
 
   // Real authentication with backend
   const handleAuth = async (e) => {
@@ -754,12 +800,10 @@ const App = () => {
   }
 
   return (
-    <ToastProvider>
-      <NotificationProvider>
-        <Router>
-          <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-            {/* Enhanced Header */}
-            <HeaderNav username={username} handleLogout={handleLogout} onOpenTagsModal={() => setShowTagsModal(true)} />
+    <Router>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+        {/* Enhanced Header */}
+        <HeaderNav username={username} handleLogout={handleLogout} onOpenTagsModal={() => setShowTagsModal(true)} />
 
         <Routes>
           <Route path="/" element={
@@ -1066,6 +1110,51 @@ const App = () => {
           )}
         </AnimatePresence>
 
+        {/* Voice Channel Button */}
+        <motion.button
+          onClick={() => setShowCreateVoiceChannel(true)}
+          className="fixed bottom-24 right-6 w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40"
+          title="Start Voice Channel"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <Phone className="w-6 h-6" />
+        </motion.button>
+
+        {/* Voice Channel Invites */}
+        <VoiceChannelInvites 
+          currentUserId={getUserId()} 
+          onJoinChannel={(channel) => setActiveVoiceChannel(channel)} 
+        />
+        
+        {/* Active Voice Channel Modal */}
+        <AnimatePresence>
+          {activeVoiceChannel && (
+            <VoiceChannelModal
+              channel={activeVoiceChannel}
+              onClose={() => setActiveVoiceChannel(null)}
+              currentUserId={getUserId()}
+              connections={userConnections}
+              stompClient={stompClient}
+            />
+          )}
+        </AnimatePresence>
+        
+        {/* Create Voice Channel Modal */}
+        <AnimatePresence>
+          {showCreateVoiceChannel && (
+            <CreateVoiceChannelModal
+              currentUserId={getUserId()}
+              connections={userConnections}
+              onClose={() => setShowCreateVoiceChannel(false)}
+              onChannelCreated={(channel) => {
+                setActiveVoiceChannel(channel);
+                setShowCreateVoiceChannel(false);
+              }}
+            />
+          )}
+        </AnimatePresence>
+
         {/* Tags Modal */}
         <AnimatePresence>
           {showTagsModal && (
@@ -1109,7 +1198,16 @@ const App = () => {
         </AnimatePresence>
       </div>
     </Router>
-    </NotificationProvider>
+  );
+};
+
+// Main App component that wraps with providers
+const App = () => {
+  return (
+    <ToastProvider>
+      <NotificationProvider>
+        <AppContent />
+      </NotificationProvider>
     </ToastProvider>
   );
 };

@@ -301,6 +301,28 @@ public class NotificationService {
     }
     
     /**
+     * Create notification for voice channel invite
+     */
+    public Notification createVoiceChannelInviteNotification(String senderId, String receiverId,
+                                                             String channelId, String channelName) {
+        // Get sender info
+        String senderName = "Someone"; // Default fallback
+        // In a real implementation, you'd fetch the sender's name from UserRepository
+        
+        String message = senderName + " invited you to join voice channel: " + channelName;
+        String actionUrl = "/voice-channels/" + channelId;
+        
+        Notification notification = new Notification(
+            receiverId, senderId, senderName, NotificationType.VOICE_CHANNEL_INVITE,
+            message, channelId, "voice_channel"
+        );
+        notification.setActionUrl(actionUrl);
+        notification.setPreviewText("Join the voice channel to start talking");
+        
+        return createNotification(notification);
+    }
+    
+    /**
      * Push unread count update to user
      */
     private void pushUnreadCountUpdate(String userId) {
