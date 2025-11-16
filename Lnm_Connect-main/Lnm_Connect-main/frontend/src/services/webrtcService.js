@@ -2,6 +2,8 @@ class WebRTCService {
   constructor() {
     this.peers = new Map(); // Map of userId -> RTCPeerConnection
     this.pendingCandidates = new Map(); // Map of userId -> Array of ICE candidates
+    this.initiatedConnections = new Set(); // Track users we've already tried to connect with
+    this.processingUsers = new Set(); // Track users currently being processed
     this.localStream = null;
     this.stompClient = null;
     this.channelId = null;
@@ -16,7 +18,26 @@ class WebRTCService {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-      ]
+        { urls: 'stun:stun2.l.google.com:19302' },
+        // Free TURN server for relaying when direct connection fails
+        {
+          urls: 'turn:openrelay.metered.ca:80',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        }
+      ],
+      iceCandidatePoolSize: 10,
+      iceTransportPolicy: 'all', // Try all connection types
     };
   }
 
@@ -156,7 +177,11 @@ class WebRTCService {
       // Handle ICE candidates
       peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-          console.log(`📡 Sending ICE candidate to ${userId}:`, event.candidate.candidate.substring(0, 50) + '...');
+          const candidateStr = event.candidate.candidate;
+          const candidateType = candidateStr.includes('host') ? '🏠 host' : 
+                               candidateStr.includes('srflx') ? '🌐 srflx' : 
+                               candidateStr.includes('relay') ? '🔄 relay' : '❓ unknown';
+          console.log(`📡 Sending ICE candidate to ${userId} [${candidateType}]:`, candidateStr.substring(0, 60) + '...');
           this.sendIceCandidate(userId, event.candidate);
         } else {
           console.log(`✅ ICE gathering complete for ${userId}`);
@@ -170,28 +195,47 @@ class WebRTCService {
 
       // Handle connection state changes
       peerConnection.onconnectionstatechange = () => {
-        console.log(`Connection state with ${userId}: ${peerConnection.connectionState}`);
+        const state = peerConnection.connectionState;
+        const emoji = state === 'connected' ? '✅' : 
+                     state === 'connecting' ? '🔄' : 
+                     state === 'failed' ? '❌' : 
+                     state === 'disconnected' ? '⚠️' : '🔷';
+        console.log(`${emoji} Connection state with ${userId}: ${state}`);
+        
         if (this.onConnectionStateCallback) {
-          this.onConnectionStateCallback(userId, peerConnection.connectionState);
+          this.onConnectionStateCallback(userId, state);
         }
         
-        if (peerConnection.connectionState === 'failed') {
-          console.error(`❌ Connection failed with ${userId}, attempting to restart ICE...`);
-          // Try to restart ICE
-          peerConnection.restartIce();
+        if (state === 'failed') {
+          console.error(`❌ Connection failed with ${userId}`);
+          console.error(`ICE connection state: ${peerConnection.iceConnectionState}`);
+          console.error(`Signaling state: ${peerConnection.signalingState}`);
+          console.error(`This peer connection has failed and needs to be recreated`);
+          // Don't auto-restart as it causes state conflicts
         }
         
-        if (peerConnection.connectionState === 'disconnected' || 
-            peerConnection.connectionState === 'closed') {
+        if (state === 'disconnected' || state === 'closed') {
           this.peers.delete(userId);
+          this.initiatedConnections.delete(userId);
         }
       };
 
       // Handle ICE connection state
       peerConnection.oniceconnectionstatechange = () => {
-        console.log(`ICE connection state with ${userId}: ${peerConnection.iceConnectionState}`);
-        if (peerConnection.iceConnectionState === 'failed') {
-          console.error(`❌ ICE connection failed with ${userId}`);
+        const state = peerConnection.iceConnectionState;
+        const emoji = state === 'connected' ? '✅' : 
+                     state === 'checking' ? '🔍' : 
+                     state === 'failed' ? '❌' : 
+                     state === 'disconnected' ? '⚠️' : '🔷';
+        console.log(`${emoji} ICE connection state with ${userId}: ${state}`);
+        
+        if (state === 'failed') {
+          console.error(`❌ ICE connection failed with ${userId} - this usually means:`);
+          console.error(`   - No valid ICE candidate pairs found`);
+          console.error(`   - Firewall blocking connection`);
+          console.error(`   - Network connectivity issues`);
+        } else if (state === 'connected' || state === 'completed') {
+          console.log(`🎉 Successfully established ICE connection with ${userId}`);
         }
       };
       
@@ -205,14 +249,17 @@ class WebRTCService {
       
       // If initiator, create and send offer
       if (isInitiator) {
-        console.log(`Creating offer for ${userId}...`);
+        console.log(`📤 Creating offer for ${userId}...`);
         const offer = await peerConnection.createOffer({
           offerToReceiveAudio: true,
           offerToReceiveVideo: false,
         });
         await peerConnection.setLocalDescription(offer);
-        console.log(`Sending offer to ${userId}`);
+        console.log(`✅ Set local description (offer) for ${userId}. Signaling state: ${peerConnection.signalingState}`);
+        console.log(`📤 Sending offer to ${userId}`);
         this.sendOffer(userId, offer);
+      } else {
+        console.log(`⏸️ Not creating offer for ${userId} (waiting to receive offer)`);
       }
       
       return peerConnection;
@@ -278,7 +325,7 @@ class WebRTCService {
    */
   async handleOffer(data) {
     const { from, offer } = data;
-    console.log(`Received offer from ${from}`);
+    console.log(`📥 Received offer from ${from}`);
 
     try {
       // Check if we already have a peer connection with this user
@@ -286,23 +333,26 @@ class WebRTCService {
       
       if (peerConnection) {
         // If we already have a connection, close it first to avoid conflicts
-        console.log(`Closing existing peer connection with ${from} before processing offer`);
+        console.log(`⚠️ Closing existing peer connection with ${from} (state: ${peerConnection.signalingState}) before processing offer`);
         peerConnection.close();
         this.peers.delete(from);
       }
       
       // Create peer connection as non-initiator
+      console.log(`Creating peer connection to handle offer from ${from}...`);
       peerConnection = await this.createPeerConnection(from, false);
       
       // Set remote description (the offer)
       await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-      console.log(`Set remote offer from ${from}`);
+      console.log(`✅ Set remote offer from ${from}. Signaling state: ${peerConnection.signalingState}`);
       
       // Create and send answer
+      console.log(`📤 Creating answer for ${from}...`);
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
+      console.log(`✅ Set local description (answer) for ${from}. Signaling state: ${peerConnection.signalingState}`);
       
-      console.log(`Sending answer to ${from}`);
+      console.log(`📤 Sending answer to ${from}`);
       this.sendAnswer(from, answer);
       
       // Process any pending ICE candidates
@@ -315,7 +365,7 @@ class WebRTCService {
         this.pendingCandidates.delete(from);
       }
     } catch (error) {
-      console.error(`Error handling offer from ${from}:`, error);
+      console.error(`❌ Error handling offer from ${from}:`, error);
     }
   }
 
@@ -324,33 +374,39 @@ class WebRTCService {
    */
   async handleAnswer(data) {
     const { from, answer } = data;
-    console.log(`Received answer from ${from}`);
+    console.log(`📥 Received answer from ${from}`);
 
     const peerConnection = this.peers.get(from);
-    if (peerConnection) {
-      try {
-        // Check if we're in the right state to accept an answer
-        if (peerConnection.signalingState === 'have-local-offer') {
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-          console.log(`Successfully set remote answer from ${from}`);
-          
-          // Process any pending ICE candidates
-          const pending = this.pendingCandidates.get(from);
-          if (pending && pending.length > 0) {
-            console.log(`Processing ${pending.length} pending ICE candidates for ${from}`);
-            for (const candidate of pending) {
-              await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-            }
-            this.pendingCandidates.delete(from);
+    if (!peerConnection) {
+      console.warn(`⚠️ No peer connection found for ${from} when receiving answer`);
+      return;
+    }
+
+    console.log(`Current signaling state with ${from}: ${peerConnection.signalingState}`);
+    
+    try {
+      // Check if we're in the right state to accept an answer
+      if (peerConnection.signalingState === 'have-local-offer') {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+        console.log(`✅ Successfully set remote answer from ${from}. New state: ${peerConnection.signalingState}`);
+        
+        // Process any pending ICE candidates
+        const pending = this.pendingCandidates.get(from);
+        if (pending && pending.length > 0) {
+          console.log(`Processing ${pending.length} pending ICE candidates for ${from}`);
+          for (const candidate of pending) {
+            await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
           }
-        } else {
-          console.warn(`Cannot set remote answer from ${from}: wrong state (${peerConnection.signalingState})`);
+          this.pendingCandidates.delete(from);
         }
-      } catch (error) {
-        console.error(`Error handling answer from ${from}:`, error);
+      } else if (peerConnection.signalingState === 'stable') {
+        console.warn(`⚠️ Ignoring duplicate answer from ${from} - connection already stable`);
+      } else {
+        console.error(`❌ Cannot set remote answer from ${from}: wrong state (${peerConnection.signalingState}). Expected 'have-local-offer'.`);
+        console.error(`This means we never sent an offer, or received answer in unexpected state.`);
       }
-    } else {
-      console.warn(`No peer connection found for ${from}`);
+    } catch (error) {
+      console.error(`❌ Error handling answer from ${from}:`, error);
     }
   }
 
@@ -359,7 +415,12 @@ class WebRTCService {
    */
   async handleIceCandidate(data) {
     const { from, candidate } = data;
-    console.log(`Received ICE candidate from ${from}`);
+    
+    const candidateStr = candidate.candidate || '';
+    const candidateType = candidateStr.includes('host') ? '🏠 host' : 
+                         candidateStr.includes('srflx') ? '🌐 srflx' : 
+                         candidateStr.includes('relay') ? '🔄 relay' : '❓ unknown';
+    console.log(`📥 Received ICE candidate from ${from} [${candidateType}]`);
 
     const peerConnection = this.peers.get(from);
     if (peerConnection) {
@@ -367,17 +428,17 @@ class WebRTCService {
         // Only add ICE candidate if remote description is set
         if (peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
           await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-          console.log(`Added ICE candidate from ${from}`);
+          console.log(`✅ Added ICE candidate from ${from}`);
         } else {
           // Queue the candidate for later
-          console.log(`Queueing ICE candidate from ${from} (remote description not set yet)`);
+          console.log(`⏸️ Queueing ICE candidate from ${from} (remote description not set yet)`);
           if (!this.pendingCandidates.has(from)) {
             this.pendingCandidates.set(from, []);
           }
           this.pendingCandidates.get(from).push(candidate);
         }
       } catch (error) {
-        console.error(`Error adding ICE candidate from ${from}:`, error);
+        console.error(`❌ Error adding ICE candidate from ${from}:`, error);
       }
     } else {
       console.warn(`No peer connection found for ${from}, queueing candidate`);
@@ -393,27 +454,57 @@ class WebRTCService {
    * Handle new user joining the channel
    */
   async handleUserJoined(userId) {
-    console.log(`User ${userId} joined the channel`);
+    console.log(`👤 User ${userId} joined the channel`);
+    
+    // Check if we're already processing this user
+    if (this.processingUsers.has(userId)) {
+      console.log(`⏳ Already processing connection with ${userId}, skipping duplicate event`);
+      return;
+    }
+    
+    // Check if we already have a connection with this user
+    if (this.peers.has(userId)) {
+      console.log(`⚠️ Already have peer connection with ${userId}, skipping`);
+      return;
+    }
+    
+    // Check if we've already initiated with this user
+    if (this.initiatedConnections.has(userId)) {
+      console.log(`⚠️ Already initiated connection with ${userId}, skipping duplicate`);
+      return;
+    }
+    
+    // Mark as processing
+    this.processingUsers.add(userId);
     
     // Only create peer connection if we should be the initiator
     // Use string comparison to determine who initiates (consistent across both clients)
     const shouldInitiate = this.currentUserId < userId;
     
-    console.log(`Should we initiate with ${userId}? ${shouldInitiate} (our ID: ${this.currentUserId})`);
+    console.log(`🤔 Should we initiate with ${userId}? ${shouldInitiate} (our ID: ${this.currentUserId})`);
     
     if (shouldInitiate) {
-      // Create peer connection as initiator
+      // Mark as initiated to prevent duplicates
+      this.initiatedConnections.add(userId);
+      
       try {
+        // Create peer connection as initiator
         await this.createPeerConnection(userId, true);
         
         if (this.onPeerJoinedCallback) {
           this.onPeerJoinedCallback(userId);
         }
       } catch (error) {
-        console.error(`Error handling user joined ${userId}:`, error);
+        console.error(`❌ Error handling user joined ${userId}:`, error);
+        // Remove from initiated on error so it can be retried
+        this.initiatedConnections.delete(userId);
+      } finally {
+        // Always remove from processing when done
+        this.processingUsers.delete(userId);
       }
     } else {
-      console.log(`Waiting for ${userId} to initiate connection (they have lower ID)`);
+      console.log(`⏸️ Waiting for ${userId} to initiate connection (they have lower ID)`);
+      this.processingUsers.delete(userId);
       if (this.onPeerJoinedCallback) {
         this.onPeerJoinedCallback(userId);
       }
@@ -424,7 +515,7 @@ class WebRTCService {
    * Handle user leaving the channel
    */
   handleUserLeft(userId) {
-    console.log(`User ${userId} left the channel`);
+    console.log(`👋 User ${userId} left the channel`);
     
     // Close peer connection
     const peerConnection = this.peers.get(userId);
@@ -435,6 +526,12 @@ class WebRTCService {
     
     // Clear pending candidates
     this.pendingCandidates.delete(userId);
+    
+    // Clear initiation tracking
+    this.initiatedConnections.delete(userId);
+    
+    // Clear processing flag
+    this.processingUsers.delete(userId);
     
     if (this.onPeerLeftCallback) {
       this.onPeerLeftCallback(userId);
@@ -454,18 +551,33 @@ class WebRTCService {
     
     for (const userId of participantIds) {
       if (userId !== this.currentUserId) {
+        // Check if we already have a connection
+        if (this.peers.has(userId)) {
+          console.log(`⚠️ Already have peer connection with ${userId}, skipping`);
+          continue;
+        }
+        
+        // Check if we've already initiated
+        if (this.initiatedConnections.has(userId)) {
+          console.log(`⚠️ Already initiated connection with ${userId}, skipping`);
+          continue;
+        }
+        
         // Only initiate if our ID is lower (deterministic ordering)
         const shouldInitiate = this.currentUserId < userId;
-        console.log(`Connecting to ${userId}, should initiate: ${shouldInitiate}`);
+        console.log(`🔌 Connecting to ${userId}, should initiate: ${shouldInitiate}`);
         
         if (shouldInitiate) {
+          // Mark as initiated
+          this.initiatedConnections.add(userId);
+          
           try {
             await this.createPeerConnection(userId, true);
           } catch (error) {
             console.error(`Failed to create connection with ${userId}:`, error);
           }
         } else {
-          console.log(`Waiting for ${userId} to initiate (they have lower ID)`);
+          console.log(`⏸️ Waiting for ${userId} to initiate (they have lower ID)`);
         }
       }
     }
@@ -519,6 +631,12 @@ class WebRTCService {
     
     // Clear pending candidates
     this.pendingCandidates.clear();
+    
+    // Clear initiation tracking
+    this.initiatedConnections.clear();
+    
+    // Clear processing users
+    this.processingUsers.clear();
 
     // Stop local stream
     if (this.localStream) {
