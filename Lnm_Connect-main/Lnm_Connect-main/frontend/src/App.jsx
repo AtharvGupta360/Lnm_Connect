@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle, Loader2, Users, X, Eye, MessageCircle, Home, UserCircle, Mail, LogOut, Sparkles, UserCheck, Bell, MessageSquare, Trash2, Reply, FileText, Phone } from "lucide-react";
+import { CheckCircle, Loader2, Users, X, Eye, MessageCircle, Home, UserCircle, Mail, LogOut, Sparkles, UserCheck, Bell, MessageSquare, Trash2, Reply, FileText } from "lucide-react";
 import SignupDetails from "./SignupDetails";
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import ProfilePage from "./ProfilePage";
@@ -24,10 +24,8 @@ import { NotificationProvider, useNotifications } from "./contexts/NotificationC
 import { followService } from "./services/followService";
 import ChatBot from "./components/ChatBot";
 import AdminUnanswered from "./pages/AdminUnanswered";
-import VoiceChannelModal from "./components/VoiceChannelModal";
-import VoiceChannelInvites from "./components/VoiceChannelInvites";
-import CreateVoiceChannelModal from "./components/CreateVoiceChannelModal";
 import UserLink from "./components/UserLink";
+import StreamVoiceChannel from "./components/StreamVoiceChannel";
 
 // Backend API URL
 const API_URL = "http://localhost:8080/api/posts";
@@ -353,9 +351,9 @@ const AppContent = () => {
   // ChatBot state
   const [showChatBot, setShowChatBot] = useState(false);
   
-  // Voice Channel state
-  const [activeVoiceChannel, setActiveVoiceChannel] = useState(null);
-  const [showCreateVoiceChannel, setShowCreateVoiceChannel] = useState(false);
+  // Stream Voice Channel state
+  const [showVoiceChannel, setShowVoiceChannel] = useState(false);
+  
   const [userConnections, setUserConnections] = useState([]);
   const [chatBotPosition, setChatBotPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -423,6 +421,20 @@ const AppContent = () => {
     return username;
   }
 
+  // Helper to get user's display name from localStorage or state
+  function getUserName() {
+    const user = localStorage.getItem("user");
+    if (user) {
+      try {
+        const parsed = JSON.parse(user);
+        return parsed.name || parsed.username || username || '';
+      } catch {
+        return username || '';
+      }
+    }
+    return username || '';
+  }
+
   // Fetch posts function
   const fetchPosts = useCallback(async () => {
     if (!isLoggedIn) return;
@@ -466,6 +478,7 @@ const AppContent = () => {
           authorId,
           user: postUser,
           username: postUsername,
+          authorPhotoUrl: item.authorPhotoUrl || null,
           title: item.title || '',
           tags: item.tags || [],
           content: item.body || item.description || '',
@@ -890,12 +903,21 @@ const AppContent = () => {
                       >
                         <div className="flex items-start space-x-3">
                           <UserLink userId={post.authorId} userName={post.user}>
-                            <motion.div
-                              whileHover={{ scale: 1.05 }}
-                              className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0 ring-2 ring-white shadow-md cursor-pointer"
-                            >
-                              {post.user?.charAt(0).toUpperCase() || 'U'}
-                            </motion.div>
+                            {post.authorPhotoUrl ? (
+                              <motion.img
+                                whileHover={{ scale: 1.05 }}
+                                src={post.authorPhotoUrl}
+                                alt={post.user}
+                                className="w-12 h-12 rounded-full object-cover flex-shrink-0 ring-2 ring-white shadow-md cursor-pointer"
+                              />
+                            ) : (
+                              <motion.div
+                                whileHover={{ scale: 1.05 }}
+                                className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0 ring-2 ring-white shadow-md cursor-pointer"
+                              >
+                                {post.user?.charAt(0).toUpperCase() || 'U'}
+                              </motion.div>
+                            )}
                           </UserLink>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
@@ -992,9 +1014,17 @@ const AppContent = () => {
                                     className="flex items-start space-x-3 bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors"
                                   >
                                     <UserLink userId={c.userId} userName={c.userName}>
-                                      <div className="w-8 h-8 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 cursor-pointer">
-                                        {c.userName ? c.userName.charAt(0).toUpperCase() : '?'}
-                                      </div>
+                                      {c.userPhotoUrl ? (
+                                        <img
+                                          src={c.userPhotoUrl}
+                                          alt={c.userName}
+                                          className="w-8 h-8 rounded-full object-cover flex-shrink-0 cursor-pointer"
+                                        />
+                                      ) : (
+                                        <div className="w-8 h-8 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 cursor-pointer">
+                                          {c.userName ? c.userName.charAt(0).toUpperCase() : '?'}
+                                        </div>
+                                      )}
                                     </UserLink>
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center justify-between">
@@ -1091,8 +1121,8 @@ const AppContent = () => {
           dragMomentum={false}
           dragElastic={0}
           dragConstraints={{
-            left: -window.innerWidth + 80,
-            right: 0,
+            left: 0,
+            right: window.innerWidth - 80,
             top: -window.innerHeight + 80,
             bottom: 0
           }}
@@ -1105,7 +1135,7 @@ const AppContent = () => {
               setShowChatBot(true);
             }
           }}
-          className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40 cursor-grab active:cursor-grabbing"
+          className="fixed bottom-6 left-6 w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40 cursor-grab active:cursor-grabbing"
           title="Ask Campus Assistant"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
@@ -1131,49 +1161,28 @@ const AppContent = () => {
           }}
           dragElastic={0.1}
           dragTransition={{ bounceStiffness: 600, bounceDamping: 20 }}
-          className="fixed bottom-24 right-6 w-16 h-16 z-40 cursor-grab active:cursor-grabbing"
+          className="fixed bottom-24 left-6 w-16 h-16 z-40 cursor-grab active:cursor-grabbing"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
         >
           <button
-            onClick={() => setShowCreateVoiceChannel(true)}
+            onClick={() => setShowVoiceChannel(true)}
             className="w-full h-full bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
-            title="Start Voice Channel"
+            title="Join Voice Channel"
           >
-            <Phone className="w-6 h-6" />
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+            </svg>
           </button>
         </motion.div>
 
-        {/* Voice Channel Invites */}
-        <VoiceChannelInvites 
-          currentUserId={getUserId()} 
-          onJoinChannel={(channel) => setActiveVoiceChannel(channel)} 
-        />
-        
-        {/* Active Voice Channel Modal */}
+        {/* Stream Voice Channel Modal */}
         <AnimatePresence>
-          {activeVoiceChannel && (
-            <VoiceChannelModal
-              channel={activeVoiceChannel}
-              onClose={() => setActiveVoiceChannel(null)}
+          {showVoiceChannel && (
+            <StreamVoiceChannel
+              onClose={() => setShowVoiceChannel(false)}
               currentUserId={getUserId()}
-              connections={userConnections}
-              stompClient={stompClient}
-            />
-          )}
-        </AnimatePresence>
-        
-        {/* Create Voice Channel Modal */}
-        <AnimatePresence>
-          {showCreateVoiceChannel && (
-            <CreateVoiceChannelModal
-              currentUserId={getUserId()}
-              connections={userConnections}
-              onClose={() => setShowCreateVoiceChannel(false)}
-              onChannelCreated={(channel) => {
-                setActiveVoiceChannel(channel);
-                setShowCreateVoiceChannel(false);
-              }}
+              currentUserName={getUserName()}
             />
           )}
         </AnimatePresence>

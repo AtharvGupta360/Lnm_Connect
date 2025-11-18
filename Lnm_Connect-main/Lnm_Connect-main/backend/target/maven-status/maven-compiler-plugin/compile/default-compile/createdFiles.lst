@@ -1,12 +1,10 @@
 com\miniproject\backend\repository\ApplicationRepository.class
 com\miniproject\backend\controller\WebRTCSignalingController.class
 com\miniproject\backend\model\Message$MessageStatus.class
-com\miniproject\backend\model\VoiceChannelInvite$InviteStatus.class
 com\miniproject\backend\dto\EventRecommendationDTO.class
 com\miniproject\backend\listener\NotificationEventListener.class
 com\miniproject\backend\controller\ClubController.class
 com\miniproject\backend\service\SearchService.class
-com\miniproject\backend\model\VoiceChannel.class
 com\miniproject\backend\repository\NotificationRepository.class
 com\miniproject\backend\config\NotificationWebSocketConfig.class
 com\miniproject\backend\config\WebSocketConfig.class
@@ -18,8 +16,6 @@ com\miniproject\backend\dto\ProjectRecommendationDTO.class
 com\miniproject\backend\model\Thread.class
 com\miniproject\backend\model\Follow.class
 com\miniproject\backend\dto\SearchResponseDTO.class
-com\miniproject\backend\dto\VoiceChannelInviteDTO.class
-com\miniproject\backend\repository\VoiceChannelInviteRepository.class
 com\miniproject\backend\controller\GlobalExceptionHandler.class
 com\miniproject\backend\controller\CertificateController$ApiError.class
 com\miniproject\backend\controller\RecommendationController.class
@@ -42,8 +38,6 @@ com\miniproject\backend\model\Recommendation.class
 com\miniproject\backend\dto\MessageDTO.class
 com\miniproject\backend\model\Vote.class
 com\miniproject\backend\service\ThreadService.class
-com\miniproject\backend\model\VoiceChannelInvite.class
-com\miniproject\backend\service\VoiceChannelService.class
 com\miniproject\backend\controller\AuthController.class
 com\miniproject\backend\model\Application$ApplicationStatus.class
 com\miniproject\backend\service\ApplicationService.class
@@ -51,7 +45,6 @@ com\miniproject\backend\model\Application.class
 com\miniproject\backend\repository\ThreadCommentRepository.class
 com\miniproject\backend\dto\FollowRequestDTO.class
 com\miniproject\backend\dto\ThreadDTO.class
-com\miniproject\backend\dto\VoiceChannelDTO$ParticipantDTO.class
 com\miniproject\backend\service\ChatService.class
 com\miniproject\backend\dto\SearchResultDTO.class
 com\miniproject\backend\dto\ProfileRecommendationDTO.class
@@ -70,7 +63,6 @@ com\miniproject\backend\dto\FollowStatusDTO.class
 com\miniproject\backend\dto\PostResponseDTO.class
 com\miniproject\backend\repository\CampusBuzzRepository.class
 com\miniproject\backend\model\Item.class
-com\miniproject\backend\controller\VoiceChannelController.class
 com\miniproject\backend\repository\EventRepository.class
 com\miniproject\backend\model\Club.class
 com\miniproject\backend\controller\ThreadCommentController.class
@@ -81,7 +73,6 @@ com\miniproject\backend\repository\UserTagRepository.class
 com\miniproject\backend\service\RecommendationEngine.class
 com\miniproject\backend\controller\CertificateController.class
 com\miniproject\backend\repository\SpaceRepository.class
-com\miniproject\backend\repository\VoiceChannelRepository.class
 com\miniproject\backend\repository\CertificateRepository.class
 com\miniproject\backend\service\SpaceService.class
 com\miniproject\backend\service\ThreadCommentService.class
@@ -110,7 +101,6 @@ com\miniproject\backend\dto\CommentDTO.class
 com\miniproject\backend\repository\UserRepository.class
 com\miniproject\backend\repository\ItemRepository.class
 com\miniproject\backend\repository\ProjectRepository.class
-com\miniproject\backend\dto\VoiceChannelDTO.class
 com\miniproject\backend\dto\VoteRequest.class
 com\miniproject\backend\repository\ReportRepository.class
 com\miniproject\backend\repository\VoteRepository.class

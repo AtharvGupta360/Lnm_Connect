@@ -19,6 +19,7 @@ public class Post {
     private String image;
     private String authorId;
     private String authorName;
+    private String authorPhotoUrl;
     private java.util.List<String> taggedUserIds;
     private java.util.List<String> taggedClubIds;
     private java.util.Set<String> likes = new java.util.HashSet<>();
@@ -59,6 +60,8 @@ public class Post {
     public void setAuthorId(String authorId) { this.authorId = authorId; }
     public String getAuthorName() { return authorName; }
     public void setAuthorName(String authorName) { this.authorName = authorName; }
+    public String getAuthorPhotoUrl() { return authorPhotoUrl; }
+    public void setAuthorPhotoUrl(String authorPhotoUrl) { this.authorPhotoUrl = authorPhotoUrl; }
     public long getCreatedAt() { return createdAt; }
     public void setCreatedAt(long createdAt) { this.createdAt = createdAt; }
 }

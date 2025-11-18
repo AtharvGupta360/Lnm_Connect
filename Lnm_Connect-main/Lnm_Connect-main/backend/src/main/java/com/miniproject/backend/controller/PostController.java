@@ -52,6 +52,14 @@ public class PostController {
     public Post addComment(@PathVariable String postId, @RequestBody com.miniproject.backend.model.Comment comment) {
         Post post = postRepository.findById(postId).orElse(null);
         if (post == null) return null;
+        
+        // Enrich comment with user photoUrl if missing
+        if (comment.getUserPhotoUrl() == null && comment.getUserId() != null) {
+            userRepository.findById(comment.getUserId()).ifPresent(commenter -> {
+                comment.setUserPhotoUrl(commenter.getPhotoUrl());
+            });
+        }
+        
         java.util.List<com.miniproject.backend.model.Comment> comments = post.getComments();
         if (comments == null) comments = new java.util.ArrayList<>();
         comments.add(comment);
@@ -126,6 +134,12 @@ public class PostController {
     @PostMapping
     public Post createPost(@RequestBody Post post) {
         post.setCreatedAt(System.currentTimeMillis());
+        // Fetch author's photoUrl if not already set
+        if (post.getAuthorPhotoUrl() == null && post.getAuthorId() != null) {
+            userRepository.findById(post.getAuthorId()).ifPresent(author -> {
+                post.setAuthorPhotoUrl(author.getPhotoUrl());
+            });
+        }
         Post savedPost = postRepository.save(post);
         
         // Extract @mentions and publish events
@@ -200,6 +214,15 @@ public class PostController {
         int end = Math.min(start + limit, posts.size());
         List<Post> paginatedPosts = start < posts.size() ? posts.subList(start, end) : new ArrayList<>();
         
+        // Enrich posts with author photoUrl if missing
+        for (Post post : paginatedPosts) {
+            if (post.getAuthorPhotoUrl() == null && post.getAuthorId() != null) {
+                userRepository.findById(post.getAuthorId()).ifPresent(postAuthor -> {
+                    post.setAuthorPhotoUrl(postAuthor.getPhotoUrl());
+                });
+            }
+        }
+        
         List<PostResponseDTO> result = new ArrayList<>();
         for (Post post : paginatedPosts) {
             result.add(applicationService.getPostWithApplyInfo(post, currentUserId));
@@ -218,6 +241,13 @@ public class PostController {
         Post post = postRepository.findById(postId).orElse(null);
         if (post == null) {
             return null;
+        }
+        
+        // Enrich post with author photoUrl if missing
+        if (post.getAuthorPhotoUrl() == null && post.getAuthorId() != null) {
+            userRepository.findById(post.getAuthorId()).ifPresent(author -> {
+                post.setAuthorPhotoUrl(author.getPhotoUrl());
+            });
         }
         
         String currentUserId = userId != null ? userId : "";

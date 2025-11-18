@@ -87,3 +87,21 @@ export const createTestNotification = async (userId, message) => {
     throw error;
   }
 };
+
+/**
+ * Send voice call invite notification
+ */
+export const sendVoiceCallInvite = async (receiverId, senderId, senderName, channelId) => {
+  try {
+    const response = await axios.post(`${API_URL}/voice-invite`, {
+      receiverId,
+      senderId,
+      senderName,
+      channelId
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error sending voice call invite:', error);
+    throw error;
+  }
+};

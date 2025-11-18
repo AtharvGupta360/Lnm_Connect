@@ -141,9 +141,17 @@ const PostDetailPage = () => {
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-start gap-4">
               <UserLink userId={post.authorId} userName={post.authorName}>
-                <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md hover:scale-105 transition-transform cursor-pointer">
-                  {post.authorName?.charAt(0).toUpperCase() || 'U'}
-                </div>
+                {post.authorPhotoUrl ? (
+                  <img
+                    src={post.authorPhotoUrl}
+                    alt={post.authorName}
+                    className="w-14 h-14 rounded-full object-cover shadow-md hover:scale-105 transition-transform cursor-pointer"
+                  />
+                ) : (
+                  <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md hover:scale-105 transition-transform cursor-pointer">
+                    {post.authorName?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                )}
               </UserLink>
               <div className="flex-1">
                 <UserLink 
@@ -259,9 +267,17 @@ const PostDetailPage = () => {
                   <div key={idx} className="bg-gray-50 rounded-lg p-4">
                     <div className="flex items-start gap-3">
                       <UserLink userId={comment.userId} userName={comment.userName}>
-                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 cursor-pointer">
-                          {comment.userName?.charAt(0).toUpperCase() || 'U'}
-                        </div>
+                        {comment.userPhotoUrl ? (
+                          <img
+                            src={comment.userPhotoUrl}
+                            alt={comment.userName}
+                            className="w-10 h-10 rounded-full object-cover flex-shrink-0 cursor-pointer"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 cursor-pointer">
+                            {comment.userName?.charAt(0).toUpperCase() || 'U'}
+                          </div>
+                        )}
                       </UserLink>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">

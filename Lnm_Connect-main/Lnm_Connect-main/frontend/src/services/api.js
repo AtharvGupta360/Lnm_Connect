@@ -122,7 +122,11 @@ export const api = {
   getUsers: () => apiClient.get('/users'),
 
   // Clubs
-  getClubs: () => apiClient.get('/clubs')
+  getClubs: () => apiClient.get('/clubs'),
+
+  // Stream Token
+  getStreamToken: (userId, validity = 3600) => 
+    apiClient.post('/stream/token', { userId, validity })
 };
 
 /**

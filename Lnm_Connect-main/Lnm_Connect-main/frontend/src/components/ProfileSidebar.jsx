@@ -54,9 +54,17 @@ const ProfileSidebar = ({ username, posts = [] }) => {
         {/* Profile Info */}
         <div className="px-4 pb-4 -mt-8">
           <div className="relative inline-block">
-            <div className="w-16 h-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-2xl ring-4 ring-white shadow-lg">
-              {username?.charAt(0).toUpperCase() || 'U'}
-            </div>
+            {profileData?.photoUrl ? (
+              <img
+                src={profileData.photoUrl}
+                alt={username}
+                className="w-16 h-16 rounded-full object-cover ring-4 ring-white shadow-lg"
+              />
+            ) : (
+              <div className="w-16 h-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-2xl ring-4 ring-white shadow-lg">
+                {username?.charAt(0).toUpperCase() || 'U'}
+              </div>
+            )}
           </div>
           
           <div className="mt-2">

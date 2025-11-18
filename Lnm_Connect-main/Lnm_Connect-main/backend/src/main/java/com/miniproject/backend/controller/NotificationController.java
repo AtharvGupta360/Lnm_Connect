@@ -107,4 +107,30 @@ public class NotificationController {
         Notification created = notificationService.createNotification(notification);
         return ResponseEntity.ok(created);
     }
+    
+    /**
+     * Create voice call invite notification
+     * POST /api/notifications/voice-invite
+     */
+    @PostMapping("/voice-invite")
+    public ResponseEntity<Notification> createVoiceInvite(
+            @RequestBody Map<String, String> request
+    ) {
+        String receiverId = request.get("receiverId");
+        String senderId = request.get("senderId");
+        String senderName = request.get("senderName");
+        String channelId = request.get("channelId");
+        
+        Notification notification = new Notification(
+            receiverId, senderId, senderName,
+            Notification.NotificationType.SYSTEM_ALERT,
+            senderName + " invited you to a voice call",
+            null, "voice_call_invite"
+        );
+        notification.setActionUrl("/voice-call?channel=" + channelId);
+        
+        Notification created = notificationService.createNotification(notification);
+        return ResponseEntity.ok(created);
+    }
 }
+

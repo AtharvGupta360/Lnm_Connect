@@ -593,9 +593,17 @@ const ProfilePage = ({ currentUser }) => {
               <motion.div key={post.id || post._id || idx} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="bg-white rounded-xl shadow border p-6">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-indigo-200 rounded-full flex items-center justify-center text-indigo-700 font-bold text-lg">
-                      {user.name?.charAt(0).toUpperCase()}
-                    </div>
+                    {user.photoUrl ? (
+                      <img
+                        src={user.photoUrl}
+                        alt={user.name}
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-indigo-200 rounded-full flex items-center justify-center text-indigo-700 font-bold text-lg">
+                        {user.name?.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <div>
                       <span className="font-medium text-slate-900">{user.name}</span>
                       <span className="ml-2 text-xs text-slate-400">{new Date(post.createdAt).toLocaleString()}</span>
