@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { spaceService } from '../services/spaceService';
 import { threadService } from '../services/threadService';
+import UserLink from '../components/UserLink';
 
 /**
  * Space Detail Page - View a specific discussion space
@@ -451,7 +452,13 @@ const ThreadCard = ({ thread, space, currentUserId, onRefresh }) => {
       
       <div className="flex items-center justify-between text-sm text-gray-500">
         <div className="flex items-center gap-4">
-          <span className="font-medium">{thread.authorName || 'Anonymous'}</span>
+          <UserLink 
+            userId={thread.authorId} 
+            userName={thread.authorName}
+            className="font-medium hover:text-indigo-600 transition-colors"
+          >
+            {thread.authorName || 'Anonymous'}
+          </UserLink>
           <span>•</span>
           <span>{thread.commentCount} comments</span>
           <span>•</span>

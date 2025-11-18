@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Phone, PhoneOff, Mic, MicOff, Volume2, VolumeX, X, UserPlus, Wifi, WifiOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { webrtcService } from '../services/webrtcService';
+import UserLink from './UserLink';
 
 const API_URL = 'http://localhost:8080/api/voice-channels';
 
@@ -356,20 +357,28 @@ const VoiceChannelModal = ({ channel, onClose, currentUserId, connections, stomp
                   key={participant.userId}
                   className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
                 >
-                  <div className="relative">
-                    <img
-                      src={participant.photoUrl || `https://ui-avatars.com/api/?name=${participant.userName}`}
-                      alt={participant.userName}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                    {participant.userId !== currentUserId && (
-                      <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
-                        isConnected ? 'bg-green-500' : 'bg-gray-400'
-                      }`} />
-                    )}
-                  </div>
+                  <UserLink userId={participant.userId} userName={participant.userName}>
+                    <div className="relative">
+                      <img
+                        src={participant.photoUrl || `https://ui-avatars.com/api/?name=${participant.userName}`}
+                        alt={participant.userName}
+                        className="w-12 h-12 rounded-full object-cover cursor-pointer"
+                      />
+                      {participant.userId !== currentUserId && (
+                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
+                          isConnected ? 'bg-green-500' : 'bg-gray-400'
+                        }`} />
+                      )}
+                    </div>
+                  </UserLink>
                   <div className="flex-1">
-                    <p className="font-medium">{participant.userName}</p>
+                    <UserLink 
+                      userId={participant.userId} 
+                      userName={participant.userName}
+                      className="font-medium hover:text-indigo-600 transition-colors"
+                    >
+                      {participant.userName}
+                    </UserLink>
                     <div className="flex items-center gap-2">
                       {participant.userId === channel.creatorId && (
                         <span className="text-xs text-indigo-600 font-semibold">Host</span>

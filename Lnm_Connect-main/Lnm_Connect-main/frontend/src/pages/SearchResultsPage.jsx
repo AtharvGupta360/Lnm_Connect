@@ -3,6 +3,7 @@ import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, User, FileText, Briefcase, Loader2, AlertCircle, MessageCircle } from 'lucide-react';
 import MessageButton from '../components/MessageButton';
+import UserLink from '../components/UserLink';
 
 const SearchResultsPage = () => {
   const [searchParams] = useSearchParams();
@@ -222,21 +223,22 @@ const ProfileCard = ({ result }) => {
       className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 border border-gray-200 hover:border-indigo-200"
     >
       <div className="flex items-start space-x-4">
-        <Link to={`/profile/${result.id}`}>
+        <UserLink userId={result.id} userName={result.title}>
           <motion.img
             whileHover={{ scale: 1.1 }}
             src={result.imageUrl}
             alt={result.title}
-            className="w-16 h-16 rounded-full object-cover ring-2 ring-indigo-100"
+            className="w-16 h-16 rounded-full object-cover ring-2 ring-indigo-100 cursor-pointer"
           />
-        </Link>
+        </UserLink>
         <div className="flex-1 min-w-0">
-          <Link
-            to={`/profile/${result.id}`}
+          <UserLink
+            userId={result.id}
+            userName={result.title}
             className="text-xl font-bold text-gray-900 hover:text-indigo-600 transition-colors"
           >
             {result.title}
-          </Link>
+          </UserLink>
           <p className="text-gray-600 text-sm mt-1">{result.subtitle}</p>
           {result.snippet && (
             <p className="text-gray-500 text-sm mt-2">{result.snippet}</p>

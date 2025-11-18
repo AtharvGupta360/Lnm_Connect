@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, Search } from 'lucide-react';
 import { chatService } from '../services/chatService';
+import UserLink from './UserLink';
 
 const ChatList = ({ userId, onSelectChat, selectedChatRoomId }) => {
   const [conversations, setConversations] = useState([]);
@@ -106,26 +107,37 @@ const ChatList = ({ userId, onSelectChat, selectedChatRoomId }) => {
               }`}
             >
               {/* Avatar */}
-              <div className="flex-shrink-0 mr-3">
-                {conv.otherUserPhotoUrl ? (
-                  <img
-                    src={conv.otherUserPhotoUrl}
-                    alt={conv.otherUserName}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold text-lg">
-                    {conv.otherUserName.charAt(0).toUpperCase()}
-                  </div>
-                )}
-              </div>
+              <UserLink 
+                userId={conv.otherUserId} 
+                userName={conv.otherUserName}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex-shrink-0 mr-3">
+                  {conv.otherUserPhotoUrl ? (
+                    <img
+                      src={conv.otherUserPhotoUrl}
+                      alt={conv.otherUserName}
+                      className="w-12 h-12 rounded-full object-cover cursor-pointer"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold text-lg cursor-pointer">
+                      {conv.otherUserName.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+              </UserLink>
 
               {/* Content */}
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start mb-1">
-                  <h3 className="font-semibold text-gray-900 truncate">
+                  <UserLink 
+                    userId={conv.otherUserId} 
+                    userName={conv.otherUserName}
+                    className="font-semibold text-gray-900 truncate hover:text-indigo-600 transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     {conv.otherUserName}
-                  </h3>
+                  </UserLink>
                   <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
                     {formatTime(conv.lastMessageTime)}
                   </span>

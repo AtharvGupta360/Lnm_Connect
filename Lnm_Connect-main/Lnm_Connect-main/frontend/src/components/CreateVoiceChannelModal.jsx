@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Phone, X } from 'lucide-react';
 import { motion } from 'framer-motion';
+import UserLink from './UserLink';
 
 const API_URL = 'http://localhost:8080/api/voice-channels';
 
@@ -138,12 +139,25 @@ const CreateVoiceChannelModal = ({ currentUserId, connections, onClose, onChanne
                         onChange={() => toggleUserSelection(conn.userId)}
                         className="w-5 h-5 text-indigo-600 rounded"
                       />
-                      <img
-                        src={conn.photoUrl || `https://ui-avatars.com/api/?name=${conn.name}`}
-                        alt={conn.name}
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                      <span className="font-medium">{conn.name}</span>
+                      <UserLink 
+                        userId={conn.userId} 
+                        userName={conn.name}
+                        onClick={(e) => e.preventDefault()}
+                      >
+                        <img
+                          src={conn.photoUrl || `https://ui-avatars.com/api/?name=${conn.name}`}
+                          alt={conn.name}
+                          className="w-10 h-10 rounded-full object-cover cursor-pointer"
+                        />
+                      </UserLink>
+                      <UserLink 
+                        userId={conn.userId} 
+                        userName={conn.name}
+                        className="font-medium hover:text-indigo-600 transition-colors"
+                        onClick={(e) => e.preventDefault()}
+                      >
+                        {conn.name}
+                      </UserLink>
                     </label>
                   ))
                 )}

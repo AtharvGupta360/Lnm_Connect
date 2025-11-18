@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Heart, MessageCircle, Eye, Calendar, User, MapPin, Tag, Loader2 } from 'lucide-react';
+import UserLink from '../components/UserLink';
 
 const API_URL = 'http://localhost:8080/api/posts';
 
@@ -139,15 +140,19 @@ const PostDetailPage = () => {
           {/* Post Header */}
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-start gap-4">
-              <Link to={`/profile/${post.authorId}`}>
-                <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md hover:scale-105 transition-transform">
+              <UserLink userId={post.authorId} userName={post.authorName}>
+                <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md hover:scale-105 transition-transform cursor-pointer">
                   {post.authorName?.charAt(0).toUpperCase() || 'U'}
                 </div>
-              </Link>
+              </UserLink>
               <div className="flex-1">
-                <Link to={`/profile/${post.authorId}`} className="text-lg font-bold text-gray-900 hover:text-indigo-600">
+                <UserLink 
+                  userId={post.authorId} 
+                  userName={post.authorName}
+                  className="text-lg font-bold text-gray-900 hover:text-indigo-600"
+                >
                   {post.authorName || 'Unknown User'}
-                </Link>
+                </UserLink>
                 <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
                   <span className="flex items-center gap-1">
                     <Calendar className="w-4 h-4" />
@@ -253,12 +258,20 @@ const PostDetailPage = () => {
                 {post.comments.map((comment, idx) => (
                   <div key={idx} className="bg-gray-50 rounded-lg p-4">
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                        {comment.userName?.charAt(0).toUpperCase() || 'U'}
-                      </div>
+                      <UserLink userId={comment.userId} userName={comment.userName}>
+                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 cursor-pointer">
+                          {comment.userName?.charAt(0).toUpperCase() || 'U'}
+                        </div>
+                      </UserLink>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-900">{comment.userName}</span>
+                          <UserLink 
+                            userId={comment.userId} 
+                            userName={comment.userName}
+                            className="font-semibold text-gray-900 hover:text-indigo-600 transition-colors"
+                          >
+                            {comment.userName}
+                          </UserLink>
                           <span className="text-xs text-gray-500">
                             {new Date(comment.timestamp).toLocaleString()}
                           </span>

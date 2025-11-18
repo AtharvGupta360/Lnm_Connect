@@ -27,6 +27,7 @@ import AdminUnanswered from "./pages/AdminUnanswered";
 import VoiceChannelModal from "./components/VoiceChannelModal";
 import VoiceChannelInvites from "./components/VoiceChannelInvites";
 import CreateVoiceChannelModal from "./components/CreateVoiceChannelModal";
+import UserLink from "./components/UserLink";
 
 // Backend API URL
 const API_URL = "http://localhost:8080/api/posts";
@@ -888,23 +889,24 @@ const AppContent = () => {
                         }`}
                       >
                         <div className="flex items-start space-x-3">
-                          <Link to={`/profile/${post.authorId || post.id}`}>
+                          <UserLink userId={post.authorId} userName={post.user}>
                             <motion.div
                               whileHover={{ scale: 1.05 }}
                               className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0 ring-2 ring-white shadow-md cursor-pointer"
                             >
                               {post.user?.charAt(0).toUpperCase() || 'U'}
                             </motion.div>
-                          </Link>
+                          </UserLink>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
                               <div className="flex items-center space-x-2">
-                                <Link 
-                                  to={`/profile/${post.authorId || post.id}`} 
+                                <UserLink 
+                                  userId={post.authorId} 
+                                  userName={post.user}
                                   className="font-bold text-gray-900 hover:text-indigo-600 transition-colors"
                                 >
                                   {post.user}
-                                </Link>
+                                </UserLink>
                                 <span className="text-sm text-gray-500">@{post.username}</span>
                                 <span className="text-sm text-gray-400">•</span>
                                 <span className="text-sm text-gray-500">{post.timestamp}</span>
@@ -989,13 +991,21 @@ const AppContent = () => {
                                     animate={{ opacity: 1, x: 0 }}
                                     className="flex items-start space-x-3 bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors"
                                   >
-                                    <div className="w-8 h-8 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
-                                      {c.userName ? c.userName.charAt(0).toUpperCase() : '?'}
-                                    </div>
+                                    <UserLink userId={c.userId} userName={c.userName}>
+                                      <div className="w-8 h-8 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 cursor-pointer">
+                                        {c.userName ? c.userName.charAt(0).toUpperCase() : '?'}
+                                      </div>
+                                    </UserLink>
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center justify-between">
                                         <div className="flex items-center space-x-2">
-                                          <span className="font-semibold text-gray-900 text-sm">{c.userName || 'User'}</span>
+                                          <UserLink 
+                                            userId={c.userId} 
+                                            userName={c.userName}
+                                            className="font-semibold text-gray-900 text-sm hover:text-indigo-600 transition-colors"
+                                          >
+                                            {c.userName || 'User'}
+                                          </UserLink>
                                           <span className="text-xs text-gray-400">{new Date(c.timestamp).toLocaleString()}</span>
                                         </div>
                                         <button

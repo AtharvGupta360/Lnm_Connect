@@ -4,6 +4,7 @@ import { Users, UserCheck, UserPlus, MessageCircle, Loader2, UserMinus, Bell, Ch
 import { followService } from '../services/followService';
 import { Link, useNavigate } from 'react-router-dom';
 import MessageButton from '../components/MessageButton';
+import UserLink from '../components/UserLink';
 
 const MyNetworkPage = () => {
   const [activeTab, setActiveTab] = useState('pending');
@@ -210,7 +211,7 @@ const MyNetworkPage = () => {
                   className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6"
                 >
                   {/* Avatar */}
-                  <Link to={`/profile/${user.userId}`} className="block">
+                  <UserLink userId={user.userId} userName={user.name}>
                     <motion.img
                       whileHover={{ scale: 1.05 }}
                       src={
@@ -220,18 +221,19 @@ const MyNetworkPage = () => {
                         )}&background=4f46e5&color=fff&size=128`
                       }
                       alt={user.name}
-                      className="w-24 h-24 rounded-full object-cover mx-auto mb-4 ring-4 ring-indigo-100"
+                      className="w-24 h-24 rounded-full object-cover mx-auto mb-4 ring-4 ring-indigo-100 cursor-pointer"
                     />
-                  </Link>
+                  </UserLink>
 
                   {/* User Info */}
                   <div className="text-center">
-                    <Link
-                      to={`/profile/${user.userId}`}
+                    <UserLink
+                      userId={user.userId}
+                      userName={user.name}
                       className="text-lg font-bold text-gray-900 hover:text-indigo-600 transition-colors"
                     >
                       {user.name}
-                    </Link>
+                    </UserLink>
                     {user.education && (
                       <p className="text-sm text-gray-600 mt-1">
                         {user.education}

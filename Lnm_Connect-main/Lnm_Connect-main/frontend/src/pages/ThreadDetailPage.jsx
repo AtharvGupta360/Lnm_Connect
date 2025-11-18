@@ -6,6 +6,7 @@ import {
   Send, Edit, Trash2, Reply, User, Pin, LockKeyhole, X
 } from 'lucide-react';
 import { threadService } from '../services/threadService';
+import UserLink from '../components/UserLink';
 
 /**
  * Thread Detail Page - View a single thread with comments
@@ -159,7 +160,13 @@ const ThreadDetailPage = () => {
           <div className="flex items-center gap-3 text-sm text-gray-500 mb-6">
             <div className="flex items-center gap-2">
               <User className="w-4 h-4" />
-              <span className="font-medium">{thread.authorName || 'Anonymous'}</span>
+              <UserLink 
+                userId={thread.authorId} 
+                userName={thread.authorName}
+                className="font-medium hover:text-indigo-600 transition-colors"
+              >
+                {thread.authorName || 'Anonymous'}
+              </UserLink>
             </div>
             <span>•</span>
             <span>{new Date(thread.createdAt).toLocaleDateString()}</span>
@@ -287,7 +294,13 @@ const ThreadDetailPage = () => {
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-900">{comment.authorName || 'Anonymous'}</span>
+                          <UserLink 
+                            userId={comment.authorId} 
+                            userName={comment.authorName}
+                            className="font-semibold text-gray-900 hover:text-indigo-600 transition-colors"
+                          >
+                            {comment.authorName || 'Anonymous'}
+                          </UserLink>
                           <span className="text-xs text-gray-500">
                             {new Date(comment.createdAt).toLocaleDateString()}
                           </span>
