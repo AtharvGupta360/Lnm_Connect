@@ -75,6 +75,19 @@ const ProfilePage = ({ currentUser }) => {
       .catch(() => setCertificates([]));
   }, [userId]);
 
+  // Scroll to section if hash is present
+  useEffect(() => {
+    const hash = window.location.hash.substring(1); // Remove #
+    if (hash) {
+      setTimeout(() => {
+        const element = document.getElementById(hash);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 500); // Wait for content to render
+    }
+  }, [loading, posts]);
+
   // Skeleton loader for profile
   if (!userId) {
     return (
@@ -355,7 +368,7 @@ const ProfilePage = ({ currentUser }) => {
         </div>
       )}
       {/* Certificates Section (collapsible cards) */}
-      <div className="mt-10">
+      <div id="achievements-section-certs" className="mt-10">
         <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-800"><FaCertificate className="text-amber-500" /> Certificates & Achievements</h3>
         <div className="space-y-4">
           {certificates.map(cert => (
@@ -460,6 +473,115 @@ const ProfilePage = ({ currentUser }) => {
           </motion.div>
         </div>
       )}
+      
+      {/* Projects Section */}
+      <div id="projects-section" className="mt-10">
+        <h3 className="text-lg font-bold mb-4 text-blue-800 flex items-center gap-2">
+          <FaUniversity />
+          {userId === currentUser?.id ? "My Projects" : `${user.name}'s Projects`}
+        </h3>
+        {ensureArray(posts).filter(post => post.tags?.some(tag => tag.toLowerCase() === 'project')).length === 0 ? (
+          <div className="text-slate-400 bg-white rounded-xl shadow border p-6">No projects yet.</div>
+        ) : (
+          <div className="space-y-6">
+            {ensureArray(posts).filter(post => post.tags?.some(tag => tag.toLowerCase() === 'project')).map((post, idx) => (
+              <motion.div key={post.id || post._id || idx} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="bg-white rounded-xl shadow border p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-blue-200 rounded-full flex items-center justify-center text-blue-700 font-bold text-lg">
+                      {user.name?.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <span className="font-medium text-slate-900">{user.name}</span>
+                      <span className="ml-2 text-xs text-slate-400">{new Date(post.createdAt).toLocaleString()}</span>
+                    </div>
+                  </div>
+                  {userId === currentUser?.id && (
+                    <button
+                      onClick={() => handleDeletePost(post.id || post._id)}
+                      className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                      title="Delete post"
+                    >
+                      <FaTrash className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                {post.tags && post.tags.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {post.tags.map((tag, tIdx) => (
+                      <span key={tIdx} className="font-bold text-blue-700 bg-blue-100 px-2 py-1 rounded-full text-xs uppercase tracking-wide border border-blue-300">#{tag}</span>
+                    ))}
+                  </div>
+                )}
+                {post.title && (
+                  <h4 className="text-lg font-bold text-slate-900 mb-2">{post.title}</h4>
+                )}
+                <div className="text-slate-800 mb-2 whitespace-pre-wrap">{post.body || post.content || post.description}</div>
+                {post.image && (
+                  <div className="mt-2 rounded-lg overflow-hidden">
+                    <img src={post.image} alt="Post content" className="w-full h-auto object-cover rounded-lg" />
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Achievements Section */}
+      <div id="achievements-section" className="mt-10">
+        <h3 className="text-lg font-bold mb-4 text-purple-800 flex items-center gap-2">
+          <FaCertificate />
+          {userId === currentUser?.id ? "My Achievements" : `${user.name}'s Achievements`}
+        </h3>
+        {ensureArray(posts).filter(post => post.tags?.some(tag => tag.toLowerCase() === 'achievement' || tag.toLowerCase() === 'achievements')).length === 0 ? (
+          <div className="text-slate-400 bg-white rounded-xl shadow border p-6">No achievements yet.</div>
+        ) : (
+          <div className="space-y-6">
+            {ensureArray(posts).filter(post => post.tags?.some(tag => tag.toLowerCase() === 'achievement' || tag.toLowerCase() === 'achievements')).map((post, idx) => (
+              <motion.div key={post.id || post._id || idx} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="bg-white rounded-xl shadow border p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-purple-200 rounded-full flex items-center justify-center text-purple-700 font-bold text-lg">
+                      {user.name?.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <span className="font-medium text-slate-900">{user.name}</span>
+                      <span className="ml-2 text-xs text-slate-400">{new Date(post.createdAt).toLocaleString()}</span>
+                    </div>
+                  </div>
+                  {userId === currentUser?.id && (
+                    <button
+                      onClick={() => handleDeletePost(post.id || post._id)}
+                      className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                      title="Delete post"
+                    >
+                      <FaTrash className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                {post.tags && post.tags.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {post.tags.map((tag, tIdx) => (
+                      <span key={tIdx} className="font-bold text-purple-700 bg-purple-100 px-2 py-1 rounded-full text-xs uppercase tracking-wide border border-purple-300">#{tag}</span>
+                    ))}
+                  </div>
+                )}
+                {post.title && (
+                  <h4 className="text-lg font-bold text-slate-900 mb-2">{post.title}</h4>
+                )}
+                <div className="text-slate-800 mb-2 whitespace-pre-wrap">{post.body || post.content || post.description}</div>
+                {post.image && (
+                  <div className="mt-2 rounded-lg overflow-hidden">
+                    <img src={post.image} alt="Post content" className="w-full h-auto object-cover rounded-lg" />
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Posts Section (clean card style) */}
       <div className="mt-10">
         <h3 className="text-lg font-bold mb-4 text-slate-800">{userId === currentUser?.id ? "Your Posts" : `${user.name}'s Posts`}</h3>
@@ -496,6 +618,9 @@ const ProfilePage = ({ currentUser }) => {
                       <span key={tIdx} className="font-bold text-indigo-700 bg-indigo-100 px-2 py-1 rounded-full text-xs uppercase tracking-wide border border-indigo-300">#{tag}</span>
                     ))}
                   </div>
+                )}
+                {post.title && (
+                  <h4 className="text-lg font-bold text-slate-900 mb-2">{post.title}</h4>
                 )}
                 <div className="text-slate-800 mb-2 whitespace-pre-wrap">{post.body || post.content || post.description}</div>
                 {post.image && (

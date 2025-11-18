@@ -102,20 +102,30 @@ const ProfileSidebar = ({ username, posts = [] }) => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
         <h4 className="font-semibold text-gray-900 text-sm mb-3">Quick Access</h4>
         <div className="space-y-2">
-          <Link
-            to="/profile"
-            className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors group"
+          <button
+            onClick={() => {
+              window.location.href = '/profile#projects-section';
+              setTimeout(() => {
+                document.getElementById('projects-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }, 100);
+            }}
+            className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors group"
           >
             <Briefcase className="w-4 h-4 text-gray-500 group-hover:text-indigo-600" />
             <span className="text-sm text-gray-700 group-hover:text-indigo-600">My Projects</span>
-          </Link>
-          <Link
-            to="/profile"
-            className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors group"
+          </button>
+          <button
+            onClick={() => {
+              window.location.href = '/profile#achievements-section';
+              setTimeout(() => {
+                document.getElementById('achievements-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }, 100);
+            }}
+            className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors group"
           >
             <Award className="w-4 h-4 text-gray-500 group-hover:text-indigo-600" />
             <span className="text-sm text-gray-700 group-hover:text-indigo-600">Achievements</span>
-          </Link>
+          </button>
         </div>
       </div>
 

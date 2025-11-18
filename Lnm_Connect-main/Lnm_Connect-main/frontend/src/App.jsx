@@ -35,7 +35,7 @@ const POST_TAGS = [
   "Hackathon", "Internship", "Placement", "Gig/Freelance Work", "Workshop",
   "Seminar", "Coding Contest", "Campus Event", "Scholarship", "Research Opportunity",
   "Project Collaboration", "Open Source", "Startup", "Club Announcement",
-  "Competition", "Volunteering", "Technical Blog", "Achievement", "Miscellaneous"
+  "Competition", "Volunteering", "Technical Blog", "Achievement", "Project", "Miscellaneous"
 ];
 
 // Professional Header Navigation Component
@@ -1110,16 +1110,29 @@ const AppContent = () => {
           )}
         </AnimatePresence>
 
-        {/* Voice Channel Button */}
-        <motion.button
-          onClick={() => setShowCreateVoiceChannel(true)}
-          className="fixed bottom-24 right-6 w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40"
-          title="Start Voice Channel"
+        {/* Voice Channel Button - Draggable */}
+        <motion.div
+          drag
+          dragConstraints={{
+            left: 0,
+            right: window.innerWidth - 64,
+            top: 0,
+            bottom: window.innerHeight - 64
+          }}
+          dragElastic={0.1}
+          dragTransition={{ bounceStiffness: 600, bounceDamping: 20 }}
+          className="fixed bottom-24 right-6 w-16 h-16 z-40 cursor-grab active:cursor-grabbing"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
         >
-          <Phone className="w-6 h-6" />
-        </motion.button>
+          <button
+            onClick={() => setShowCreateVoiceChannel(true)}
+            className="w-full h-full bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
+            title="Start Voice Channel"
+          >
+            <Phone className="w-6 h-6" />
+          </button>
+        </motion.div>
 
         {/* Voice Channel Invites */}
         <VoiceChannelInvites 
@@ -1710,13 +1723,13 @@ function ApplicantsModal({ applicants, onClose }) {
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40"
+      className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
       <motion.div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden p-8 relative flex flex-col"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden p-8 relative flex flex-col pointer-events-auto"
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}

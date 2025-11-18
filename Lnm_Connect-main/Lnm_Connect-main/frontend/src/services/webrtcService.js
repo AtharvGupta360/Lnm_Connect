@@ -4,53 +4,119 @@ class WebRTCService {
     this.pendingCandidates = new Map(); // Map of userId -> Array of ICE candidates
     this.initiatedConnections = new Set(); // Track users we've already tried to connect with
     this.processingUsers = new Set(); // Track users currently being processed
+    this.connectionTimers = new Map(); // Track connection timeout timers
+    this.answerWaitTimers = new Map(); // Timers waiting for remote answer
+    this.offerRetryCounts = new Map(); // Number of offer retries per user
+    this.candidateTypes = new Map(); // Map of userId -> Set of candidate types seen ('host','srflx','relay')
     this.localStream = null;
     this.stompClient = null;
     this.channelId = null;
     this.currentUserId = null;
+    this.subscriptions = []; // Track WebSocket subscriptions for cleanup
     this.onPeerJoinedCallback = null;
     this.onPeerLeftCallback = null;
     this.onStreamCallback = null;
     this.onConnectionStateCallback = null;
+    this.forceTurnOnly = false; // When true, use TURN-only (relay) for ICE
     
-    // ICE servers configuration
-    this.iceServers = {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        // Free TURN server for relaying when direct connection fails
-        {
-          urls: 'turn:openrelay.metered.ca:80',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        }
-      ],
+    // Base ICE servers list (will be composed into config dynamically)
+    const baseServers = [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' },
+      // Multiple free TURN servers for better reliability
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      // Note: viagenie is deprecated/unreliable now, keep for compatibility but avoid if possible
+      {
+        urls: 'turn:numb.viagenie.ca',
+        username: 'webrtc@live.com',
+        credential: 'muazkh'
+      }
+    ];
+
+    // Allow override via Vite env (VITE_TURN_URLS comma-separated, VITE_TURN_USERNAME, VITE_TURN_CREDENTIAL)
+    try {
+      const env = import.meta?.env || {};
+      const urlsEnv = env.VITE_TURN_URLS;
+      const userEnv = env.VITE_TURN_USERNAME;
+      const credEnv = env.VITE_TURN_CREDENTIAL;
+      if (urlsEnv && userEnv && credEnv) {
+        const urls = String(urlsEnv).split(',').map(u => u.trim()).filter(Boolean);
+        const customTurn = urls.map(u => ({ urls: u, username: userEnv, credential: credEnv }));
+        console.log('🧊 Using TURN servers from env:', urls);
+        this.allIceServers = [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
+          ...customTurn,
+        ];
+      } else {
+        this.allIceServers = baseServers;
+      }
+    } catch (e) {
+      console.warn('Env TURN configuration not applied:', e);
+      this.allIceServers = baseServers;
+    }
+  }
+
+  // Configure TURN-only mode (relay candidates only)
+  setTurnOnly(enabled) {
+    this.forceTurnOnly = !!enabled;
+    console.log(`🎛️ TURN-only mode ${this.forceTurnOnly ? 'ENABLED' : 'DISABLED'}`);
+  }
+
+  // Compose RTCConfiguration based on current flags
+  getRtcConfig() {
+    const turnServers = this.allIceServers.filter(s => String(s.urls).startsWith('turn:'));
+    const stunServers = this.allIceServers.filter(s => String(s.urls).startsWith('stun:'));
+    const iceServers = this.forceTurnOnly ? turnServers : [...stunServers, ...turnServers];
+    const cfg = {
+      iceServers,
       iceCandidatePoolSize: 10,
-      iceTransportPolicy: 'all', // Try all connection types
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require'
     };
+    // In TURN-only mode force relay candidates
+    cfg.iceTransportPolicy = this.forceTurnOnly ? 'relay' : 'all';
+    return cfg;
   }
 
   /**
-   * Initialize WebRTC with STOMP client for signaling
+   * Initialize WebRTC service
    */
-  initialize(stompClient, channelId, currentUserId) {
+  async initialize(stompClient, channelId, currentUserId) {
+    console.log(`🔧 Initializing WebRTC for user ${currentUserId} in channel ${channelId}`);
+    
+    // If already initialized with different user, clean up first
+    if (this.currentUserId && this.currentUserId !== currentUserId) {
+      console.log(`⚠️ User changed from ${this.currentUserId} to ${currentUserId}, cleaning up old connections`);
+      this.leave();
+    }
+    
     this.stompClient = stompClient;
     this.channelId = channelId;
     this.currentUserId = currentUserId;
     
-    // Subscribe to WebRTC signaling messages
-    this.subscribeToSignaling();
+    // Subscribe to WebRTC signaling messages and wait for them to be ready
+    await this.subscribeToSignaling();
   }
 
   /**
@@ -78,40 +144,68 @@ class WebRTCService {
   /**
    * Subscribe to WebRTC signaling messages via WebSocket
    */
-  subscribeToSignaling() {
+  async subscribeToSignaling() {
+    console.log(`📡 Subscribing to WebRTC signaling for channel ${this.channelId}`);
+    console.log(`📡 Current user subscribing: ${this.currentUserId}`);
+    
+    // Track subscriptions
+    const subscriptions = [];
+    
     // Subscribe to offers
-    this.stompClient.subscribe(`/user/queue/voice-channel/offer`, (message) => {
+    const offerSub = this.stompClient.subscribe(`/user/queue/voice-channel/offer`, (message) => {
+      console.log(`📨 RAW offer message received by ${this.currentUserId}:`, message);
       const data = JSON.parse(message.body);
+      console.log(`📥 Parsed offer data - from: ${data.from}, to: ${data.to}:`, data);
       this.handleOffer(data);
     });
+    subscriptions.push(offerSub);
+    console.log(`✅ Subscribed to offers for user ${this.currentUserId}`);
 
     // Subscribe to answers
-    this.stompClient.subscribe(`/user/queue/voice-channel/answer`, (message) => {
+    const answerSub = this.stompClient.subscribe(`/user/queue/voice-channel/answer`, (message) => {
+      console.log(`📨 RAW answer message received by ${this.currentUserId}:`, message);
       const data = JSON.parse(message.body);
+      console.log(`📥 Parsed answer data - from: ${data.from}, to: ${data.to}:`, data);
       this.handleAnswer(data);
     });
+    subscriptions.push(answerSub);
+    console.log(`✅ Subscribed to answers for user ${this.currentUserId}`);
 
     // Subscribe to ICE candidates
-    this.stompClient.subscribe(`/user/queue/voice-channel/ice-candidate`, (message) => {
+    const iceSub = this.stompClient.subscribe(`/user/queue/voice-channel/ice-candidate`, (message) => {
       const data = JSON.parse(message.body);
       this.handleIceCandidate(data);
     });
+    subscriptions.push(iceSub);
+    console.log(`✅ Subscribed to ICE candidates for user ${this.currentUserId}`);
 
     // Subscribe to user joined notifications
-    this.stompClient.subscribe(`/topic/voice-channel/${this.channelId}/user-joined`, (message) => {
+    const joinedSub = this.stompClient.subscribe(`/topic/voice-channel/${this.channelId}/user-joined`, (message) => {
       const data = JSON.parse(message.body);
+      console.log(`📢 User joined notification received - userId: ${data.userId}, currentUser: ${this.currentUserId}`);
       if (data.userId !== this.currentUserId) {
         this.handleUserJoined(data.userId);
       }
     });
+    subscriptions.push(joinedSub);
+    console.log(`✅ Subscribed to user-joined for channel ${this.channelId}`);
 
     // Subscribe to user left notifications
-    this.stompClient.subscribe(`/topic/voice-channel/${this.channelId}/user-left`, (message) => {
+    const leftSub = this.stompClient.subscribe(`/topic/voice-channel/${this.channelId}/user-left`, (message) => {
       const data = JSON.parse(message.body);
       if (data.userId !== this.currentUserId) {
         this.handleUserLeft(data.userId);
       }
     });
+    subscriptions.push(leftSub);
+    console.log(`✅ Subscribed to user-left for channel ${this.channelId}`);
+    
+    // Store subscriptions for cleanup
+    this.subscriptions = subscriptions;
+    
+    // Wait for subscriptions to be fully active
+    await new Promise(resolve => setTimeout(resolve, 500));
+    console.log(`✅ All subscriptions ready for user ${this.currentUserId}`);
   }
 
   /**
@@ -151,8 +245,10 @@ class WebRTCService {
     }
     
     try {
-      // Create RTCPeerConnection
-      const peerConnection = new RTCPeerConnection(this.iceServers);
+      // Create RTCPeerConnection with current ICE configuration
+      const rtcConfig = this.getRtcConfig();
+      console.log('🧊 Using RTCConfiguration:', rtcConfig);
+      const peerConnection = new RTCPeerConnection(rtcConfig);
       
       console.log(`Peer connection created for ${userId}, adding local tracks...`);
       
@@ -161,6 +257,9 @@ class WebRTCService {
         peerConnection.addTrack(track, this.localStream);
         console.log(`Added local ${track.kind} track for ${userId}:`, track.label);
       });
+
+      // Reset candidate type tracking for this peer
+      this.candidateTypes.set(userId, new Set());
 
       // Handle incoming tracks (remote audio)
       peerConnection.ontrack = (event) => {
@@ -186,9 +285,24 @@ class WebRTCService {
                                candidateStr.includes('srflx') ? '🌐 srflx' : 
                                candidateStr.includes('relay') ? '🔄 relay' : '❓ unknown';
           console.log(`📡 Sending ICE candidate to ${userId} [${candidateType}]:`, candidateStr.substring(0, 60) + '...');
+          // Track type for diagnostics
+          const set = this.candidateTypes.get(userId) || new Set();
+          if (candidateStr.includes('host')) set.add('host');
+          if (candidateStr.includes('srflx')) set.add('srflx');
+          if (candidateStr.includes('relay')) set.add('relay');
+          this.candidateTypes.set(userId, set);
           this.sendIceCandidate(userId, event.candidate);
         } else {
           console.log(`✅ ICE gathering complete for ${userId}`);
+          // Diagnostics: warn if TURN-only but no relay candidates gathered
+          if (this.forceTurnOnly) {
+            const set = this.candidateTypes.get(userId) || new Set();
+            if (!set.has('relay')) {
+              console.warn(`⚠️ TURN-only is enabled but no relay candidates were gathered for ${userId}.`);
+              console.warn(`   This indicates the configured TURN servers are unreachable or blocked.`);
+              console.warn(`   Configure valid TURN credentials via VITE_TURN_URLS/VITE_TURN_USERNAME/VITE_TURN_CREDENTIAL.`);
+            }
+          }
         }
       };
 
@@ -233,13 +347,51 @@ class WebRTCService {
                      state === 'disconnected' ? '⚠️' : '🔷';
         console.log(`${emoji} ICE connection state with ${userId}: ${state}`);
         
+        // Clear any existing timeout
+        if (this.connectionTimers.has(userId)) {
+          clearTimeout(this.connectionTimers.get(userId));
+          this.connectionTimers.delete(userId);
+        }
+        
+        if (state === 'checking') {
+          // Set a 15-second timeout for ICE checking
+          const timer = setTimeout(() => {
+            const currentState = peerConnection.iceConnectionState;
+            if (currentState === 'checking') {
+              console.warn(`⏰ Connection timeout with ${userId} - still in 'checking' after 15s`);
+              console.warn(`This suggests ICE candidates are not working. Cleaning up...`);
+              peerConnection.close();
+              this.peers.delete(userId);
+              this.initiatedConnections.delete(userId);
+              this.connectionTimers.delete(userId);
+              
+              if (this.onConnectionStateCallback) {
+                this.onConnectionStateCallback(userId, 'failed');
+              }
+            }
+          }, 15000);
+          this.connectionTimers.set(userId, timer);
+        }
+        
         if (state === 'failed') {
           console.error(`❌ ICE connection failed with ${userId} - this usually means:`);
           console.error(`   - No valid ICE candidate pairs found`);
           console.error(`   - Firewall blocking connection`);
           console.error(`   - Network connectivity issues`);
+          if (this.onConnectionStateCallback) {
+            this.onConnectionStateCallback(userId, 'failed');
+          }
         } else if (state === 'connected' || state === 'completed') {
           console.log(`🎉 Successfully established ICE connection with ${userId}`);
+          // Some browsers may not update RTCPeerConnection.connectionState promptly.
+          // Reflect connectivity in UI based on ICE success.
+          if (this.onConnectionStateCallback) {
+            this.onConnectionStateCallback(userId, 'connected');
+          }
+        } else if (state === 'disconnected') {
+          if (this.onConnectionStateCallback) {
+            this.onConnectionStateCallback(userId, 'disconnected');
+          }
         }
       };
       
@@ -262,6 +414,58 @@ class WebRTCService {
         console.log(`✅ Set local description (offer) for ${userId}. Signaling state: ${peerConnection.signalingState}`);
         console.log(`📤 Sending offer to ${userId}`);
         this.sendOffer(userId, offer);
+
+        // Start answer wait timer with limited retries
+        const startAnswerWait = (attempt) => {
+          const waitMs = attempt === 1 ? 4000 : attempt === 2 ? 6000 : 8000;
+          const timer = setTimeout(async () => {
+            const pc = this.peers.get(userId);
+            if (!pc) {
+              console.warn(`⏳ Offer wait: peer ${userId} no longer exists, stopping retries`);
+              this.answerWaitTimers.delete(userId);
+              this.offerRetryCounts.delete(userId);
+              return;
+            }
+
+            if (pc.signalingState === 'have-local-offer') {
+              const retries = this.offerRetryCounts.get(userId) || 0;
+              if (retries >= 3) {
+                console.error(`❌ No answer from ${userId} after ${retries} retries. Giving up.`);
+                this.answerWaitTimers.delete(userId);
+                return;
+              }
+
+              try {
+                const nextAttempt = retries + 1;
+                this.offerRetryCounts.set(userId, nextAttempt);
+                console.warn(`🔁 No answer yet from ${userId}. Resending offer (attempt ${nextAttempt}) with ICE restart`);
+                const newOffer = await pc.createOffer({
+                  offerToReceiveAudio: true,
+                  offerToReceiveVideo: false,
+                  iceRestart: true,
+                });
+                await pc.setLocalDescription(newOffer);
+                this.sendOffer(userId, newOffer);
+                // Schedule next wait
+                startAnswerWait(nextAttempt + 1);
+              } catch (e) {
+                console.error(`❌ Error during offer retry to ${userId}:`, e);
+                this.answerWaitTimers.delete(userId);
+              }
+            } else {
+              // We likely received an answer and moved to stable
+              this.answerWaitTimers.delete(userId);
+              this.offerRetryCounts.delete(userId);
+            }
+          }, waitMs);
+
+          // Track timer
+          this.answerWaitTimers.set(userId, timer);
+        };
+
+        // Initialize retries tracking
+        this.offerRetryCounts.set(userId, 0);
+        startAnswerWait(1);
       } else {
         console.log(`⏸️ Not creating offer for ${userId} (waiting to receive offer)`);
       }
@@ -277,16 +481,22 @@ class WebRTCService {
    * Send WebRTC offer via WebSocket
    */
   sendOffer(toUserId, offer) {
+    console.log(`📤 Attempting to send offer from ${this.currentUserId} to ${toUserId}`);
     if (this.stompClient && this.stompClient.connected) {
+      const message = {
+        from: this.currentUserId,
+        to: toUserId,
+        channelId: this.channelId,
+        offer: offer,
+      };
+      console.log(`📤 Publishing offer message:`, message);
       this.stompClient.publish({
         destination: `/app/voice-channel/${this.channelId}/offer`,
-        body: JSON.stringify({
-          from: this.currentUserId,
-          to: toUserId,
-          channelId: this.channelId,
-          offer: offer,
-        }),
+        body: JSON.stringify(message),
       });
+      console.log(`✅ Offer sent successfully to ${toUserId}`);
+    } else {
+      console.error(`❌ Cannot send offer - STOMP not connected`);
     }
   }
 
@@ -294,16 +504,22 @@ class WebRTCService {
    * Send WebRTC answer via WebSocket
    */
   sendAnswer(toUserId, answer) {
+    console.log(`📤 Attempting to send answer from ${this.currentUserId} to ${toUserId}`);
     if (this.stompClient && this.stompClient.connected) {
+      const message = {
+        from: this.currentUserId,
+        to: toUserId,
+        channelId: this.channelId,
+        answer: answer,
+      };
+      console.log(`📤 Publishing answer message:`, message);
       this.stompClient.publish({
         destination: `/app/voice-channel/${this.channelId}/answer`,
-        body: JSON.stringify({
-          from: this.currentUserId,
-          to: toUserId,
-          channelId: this.channelId,
-          answer: answer,
-        }),
+        body: JSON.stringify(message),
       });
+      console.log(`✅ Answer sent successfully to ${toUserId}`);
+    } else {
+      console.error(`❌ Cannot send answer - STOMP not connected`);
     }
   }
 
@@ -393,6 +609,12 @@ class WebRTCService {
       if (peerConnection.signalingState === 'have-local-offer') {
         await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
         console.log(`✅ Successfully set remote answer from ${from}. New state: ${peerConnection.signalingState}`);
+        // Clear any waiting/retry timers for this peer now that we have the answer
+        if (this.answerWaitTimers.has(from)) {
+          clearTimeout(this.answerWaitTimers.get(from));
+          this.answerWaitTimers.delete(from);
+        }
+        this.offerRetryCounts.delete(from);
         
         // Process any pending ICE candidates
         const pending = this.pendingCandidates.get(from);
@@ -514,28 +736,49 @@ class WebRTCService {
     if (shouldInitiate) {
       for (const userId of participantIds) {
         if (userId !== this.currentUserId) {
-          // Check if we already have a connection
-          if (this.peers.has(userId)) {
-            console.log(`⚠️ Already have peer connection with ${userId}, skipping`);
-            continue;
+          // Check if we already have a peer connection
+          const existingPeer = this.peers.get(userId);
+          
+          if (existingPeer) {
+            const connectionState = existingPeer.connectionState;
+            const iceState = existingPeer.iceConnectionState;
+            
+            console.log(`🔍 Existing peer ${userId}: connectionState=${connectionState}, iceState=${iceState}`);
+            
+            // If connection is working or in progress, skip
+            if (connectionState === 'connected' || 
+                (connectionState === 'connecting' && iceState !== 'failed')) {
+              console.log(`⏭️ Skipping ${userId} - already ${connectionState}/${iceState}`);
+              continue;
+            }
+            
+            // If connection is stuck or failed, clean up
+            if (connectionState === 'failed' || connectionState === 'closed' ||
+                iceState === 'failed' || iceState === 'disconnected') {
+              console.log(`🔄 Cleaning up failed connection with ${userId} (${connectionState}/${iceState})`);
+              existingPeer.close();
+              this.peers.delete(userId);
+              this.initiatedConnections.delete(userId);
+            } else if (connectionState === 'connecting' && iceState === 'checking') {
+              // Still connecting, give it more time
+              console.log(`⏳ Connection with ${userId} still in progress, skipping for now`);
+              continue;
+            }
           }
           
-          // Check if we've already initiated
-          if (this.initiatedConnections.has(userId)) {
-            console.log(`⚠️ Already initiated connection with ${userId}, skipping`);
-            continue;
-          }
-          
-          // Mark as initiated
-          this.initiatedConnections.add(userId);
-          
-          console.log(`📤 Initiating connection with existing participant ${userId}`);
-          
-          try {
-            await this.createPeerConnection(userId, true);
-          } catch (error) {
-            console.error(`❌ Failed to create connection with ${userId}:`, error);
-            this.initiatedConnections.delete(userId);
+          // Check if we have a peer connection now (should be cleaned up if it was bad)
+          if (!this.peers.has(userId)) {
+            // Mark as initiated
+            this.initiatedConnections.add(userId);
+            
+            console.log(`📤 Initiating connection with existing participant ${userId}`);
+            
+            try {
+              await this.createPeerConnection(userId, true);
+            } catch (error) {
+              console.error(`❌ Failed to create connection with ${userId}:`, error);
+              this.initiatedConnections.delete(userId);
+            }
           }
         }
       }
@@ -570,6 +813,31 @@ class WebRTCService {
    */
   leave() {
     console.log('Leaving voice channel');
+    
+    // Clear all connection timers
+    this.connectionTimers.forEach((timer) => {
+      clearTimeout(timer);
+    });
+    this.connectionTimers.clear();
+
+    // Clear all answer wait timers
+    this.answerWaitTimers.forEach((timer) => {
+      clearTimeout(timer);
+    });
+    this.answerWaitTimers.clear();
+    this.offerRetryCounts.clear();
+    
+    // Unsubscribe from all subscriptions
+    if (this.subscriptions) {
+      this.subscriptions.forEach(sub => {
+        try {
+          sub.unsubscribe();
+        } catch (e) {
+          console.warn('Error unsubscribing:', e);
+        }
+      });
+      this.subscriptions = [];
+    }
     
     // Notify other users
     if (this.stompClient && this.stompClient.connected) {

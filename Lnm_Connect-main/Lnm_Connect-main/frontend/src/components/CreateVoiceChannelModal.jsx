@@ -74,13 +74,13 @@ const CreateVoiceChannelModal = ({ currentUserId, connections, onClose, onChanne
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
       onClick={onClose}
     >
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="bg-white rounded-lg shadow-2xl w-full max-w-md mx-4 overflow-hidden"
+        className="bg-white rounded-lg shadow-2xl w-full max-w-md mx-4 overflow-hidden pointer-events-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

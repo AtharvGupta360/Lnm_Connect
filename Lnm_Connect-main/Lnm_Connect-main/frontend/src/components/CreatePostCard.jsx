@@ -18,7 +18,7 @@ const POST_TAGS = [
   "Hackathon", "Internship", "Placement", "Gig/Freelance Work", "Workshop",
   "Seminar", "Coding Contest", "Campus Event", "Scholarship", "Research Opportunity",
   "Project Collaboration", "Open Source", "Startup", "Club Announcement",
-  "Competition", "Volunteering", "Technical Blog", "Achievement", "Miscellaneous"
+  "Competition", "Volunteering", "Technical Blog", "Achievement", "Project", "Miscellaneous"
 ];
 
 const CreatePostCard = ({ username, onPostCreated }) => {

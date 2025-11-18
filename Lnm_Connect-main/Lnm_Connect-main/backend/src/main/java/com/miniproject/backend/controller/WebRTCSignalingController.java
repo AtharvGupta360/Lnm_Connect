@@ -23,7 +23,10 @@ public class WebRTCSignalingController {
      */
     @MessageMapping("/voice-channel/{channelId}/offer")
     public void handleOffer(@DestinationVariable String channelId, @Payload Map<String, Object> message) {
+        String fromUserId = (String) message.get("from");
         String toUserId = (String) message.get("to");
+        
+        System.out.println("📤 WebRTC Offer received - Channel: " + channelId + ", From: " + fromUserId + " → To: " + toUserId);
         
         // Forward the offer to the target user
         messagingTemplate.convertAndSendToUser(
@@ -31,6 +34,8 @@ public class WebRTCSignalingController {
             "/queue/voice-channel/offer",
             message
         );
+        
+        System.out.println("✅ Offer forwarded to user: " + toUserId);
     }
 
     /**
@@ -39,7 +44,10 @@ public class WebRTCSignalingController {
      */
     @MessageMapping("/voice-channel/{channelId}/answer")
     public void handleAnswer(@DestinationVariable String channelId, @Payload Map<String, Object> message) {
+        String fromUserId = (String) message.get("from");
         String toUserId = (String) message.get("to");
+        
+        System.out.println("📤 WebRTC Answer received - Channel: " + channelId + ", From: " + fromUserId + " → To: " + toUserId);
         
         // Forward the answer to the target user
         messagingTemplate.convertAndSendToUser(
@@ -47,6 +55,8 @@ public class WebRTCSignalingController {
             "/queue/voice-channel/answer",
             message
         );
+        
+        System.out.println("✅ Answer forwarded to user: " + toUserId);
     }
 
     /**

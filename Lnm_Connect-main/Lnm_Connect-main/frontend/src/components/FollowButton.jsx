@@ -5,7 +5,7 @@ import { followService } from '../services/followService';
 
 /**
  * Dynamic Follow Button Component
- * Shows different states: Follow, Pending, Following, Accept/Reject
+ * Shows different states: Connect, Pending, Following, Connected, Accept/Reject
  */
 const FollowButton = ({ currentUserId, targetUserId, className = '', onStatusChange }) => {
   const [status, setStatus] = useState(null);
@@ -22,6 +22,7 @@ const FollowButton = ({ currentUserId, targetUserId, className = '', onStatusCha
     try {
       setLoading(true);
       const data = await followService.getFollowStatus(currentUserId, targetUserId);
+      console.log('Follow status loaded:', { currentUserId, targetUserId, status: data });
       setStatus(data);
     } catch (error) {
       console.error('Error loading follow status:', error);
@@ -177,12 +178,12 @@ const FollowButton = ({ currentUserId, targetUserId, className = '', onStatusCha
         title={isMutualConnection ? 'Mutual connection - Click to remove' : 'You are following - Click to unfollow'}
       >
         <UserCheck className="w-5 h-5" />
-        {isMutualConnection ? '✓ Connected' : 'Following'}
+        {isMutualConnection ? 'Connected' : 'Following'}
       </motion.button>
     );
   }
 
-  // Case 4: Not following (Show Follow button)
+  // Case 4: Not following (Show Connect button)
   return (
     <motion.button
       whileHover={{ scale: 1.05 }}
